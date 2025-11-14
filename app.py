@@ -73,7 +73,7 @@ FIELD_SEARCH_QUERIES = {
     "it_infra_budget_capex": ['"{company}" IT budget capex investment']
 }
 
-# --- Concise Extraction Functions ---
+# --- Enhanced Extraction Functions with Source URLs ---
 def search_for_field(company_name: str, field_name: str) -> List[Dict]:
     """Search for specific field information"""
     queries = FIELD_SEARCH_QUERIES.get(field_name, [f'"{company_name}" {field_name}'])
@@ -100,8 +100,8 @@ def search_for_field(company_name: str, field_name: str) -> List[Dict]:
     
     return all_results
 
-def extract_concise_field_data(company_name: str, field_name: str, search_results: List[Dict]) -> str:
-    """Extract SHORT, CRISP information for a single field"""
+def extract_concise_field_with_sources(company_name: str, field_name: str, search_results: List[Dict]) -> str:
+    """Extract SHORT, CRISP information for a single field WITH SOURCE URLs"""
     
     if not search_results:
         return "N/A"
@@ -111,6 +111,9 @@ def extract_concise_field_data(company_name: str, field_name: str, search_result
     for i, result in enumerate(search_results):
         research_text += f"Source {i+1}: {result['content'][:200]}\n"
         research_text += f"URL: {result['url']}\n\n"
+    
+    # Get unique source URLs (limit to 2 for conciseness)
+    unique_urls = list(set([result['url'] for result in search_results]))[:2]
     
     # Concise extraction prompts for each field
     concise_prompts = {
@@ -168,16 +171,23 @@ def extract_concise_field_data(company_name: str, field_name: str, search_result
         # Limit response length
         if len(response) > 200:
             response = response[:197] + "..."
+        
+        # Add source URLs to the response
+        if unique_urls and response != "N/A":
+            if len(unique_urls) == 1:
+                response += f" [Source: {unique_urls[0]}]"
+            else:
+                response += f" [Sources: {', '.join(unique_urls)}]"
             
         return response
             
     except Exception as e:
         return "N/A"
 
-def generate_concise_relevance(company_data: Dict, company_name: str) -> tuple:
-    """Generate concise Syntel relevance analysis"""
+def generate_concise_relevance_with_sources(company_data: Dict, company_name: str, search_results: List[Dict]) -> tuple:
+    """Generate concise Syntel relevance analysis with source references"""
     
-    # Create brief context
+    # Create brief context with source references
     context = ""
     key_fields = ["branch_network_count", "expansion_news_12mo", "iot_automation_edge_integration", 
                   "digital_transformation_initiatives", "it_infra_budget_capex"]
@@ -186,10 +196,20 @@ def generate_concise_relevance(company_data: Dict, company_name: str) -> tuple:
         if company_data.get(field) and company_data[field] != "N/A":
             context += f"{field}: {company_data[field]}\n"
     
+    # Get relevant URLs from all search results for context
+    all_urls = []
+    for result in search_results:
+        if result['url'] not in all_urls:
+            all_urls.append(result['url'])
+    
+    source_context = "Based on comprehensive research including: " + ", ".join(all_urls[:3]) + "."
+    
     relevance_prompt = f"""
     Based on this company data, create 3 CONCISE bullet points for Syntel relevance and score intent.
     
     Company: {company_name}
+    {source_context}
+    
     Key Data:
     {context}
     
@@ -245,38 +265,43 @@ def generate_concise_relevance(company_data: Dict, company_name: str) -> tuple:
         return fallback_bullets, "Medium"
 
 # --- Main Research Function ---
-def research_concise_intelligence(company_name: str) -> Dict[str, Any]:
-    """Main function to research all fields with concise outputs"""
+def research_concise_intelligence_with_sources(company_name: str) -> Dict[str, Any]:
+    """Main function to research all fields with concise outputs AND source URLs"""
     
     company_data = {}
+    all_search_results = []  # Collect all results for relevance analysis
     
-    # Research each field individually with concise extraction
+    # Research each field individually with concise extraction and sources
     total_fields = len(REQUIRED_FIELDS) - 2  # Exclude relevance fields
     for i, field in enumerate(REQUIRED_FIELDS[:-2]):
         progress = (i / total_fields) * 80
         st.session_state.progress_bar.progress(int(progress))
         st.session_state.status_text.info(f"🔍 Researching {field.replace('_', ' ').title()}...")
         
-        # Search and extract concise data
+        # Search and extract concise data with sources
         search_results = search_for_field(company_name, field)
-        field_data = extract_concise_field_data(company_name, field, search_results)
+        all_search_results.extend(search_results)  # Collect for relevance analysis
+        
+        field_data = extract_concise_field_with_sources(company_name, field, search_results)
         company_data[field] = field_data
         
         time.sleep(1)
     
-    # Generate concise relevance analysis
+    # Generate concise relevance analysis with source context
     st.session_state.status_text.info("🎯 Analyzing Syntel relevance...")
     st.session_state.progress_bar.progress(90)
     
-    relevance_bullets, intent_score = generate_concise_relevance(company_data, company_name)
+    relevance_bullets, intent_score = generate_concise_relevance_with_sources(
+        company_data, company_name, all_search_results
+    )
     company_data["why_relevant_to_syntel_bullets"] = relevance_bullets
     company_data["intent_scoring_level"] = intent_score
     
     return company_data
 
 # --- Display Functions ---
-def format_concise_display(company_input: str, data_dict: dict) -> pd.DataFrame:
-    """Transform data into concise display format"""
+def format_concise_display_with_sources(company_input: str, data_dict: dict) -> pd.DataFrame:
+    """Transform data into concise display format with sources"""
     
     mapping = {
         "Company Name": "company_name",
@@ -317,19 +342,31 @@ def format_concise_display(company_input: str, data_dict: dict) -> pd.DataFrame:
             else:
                 data_list.append({"Column Header": display_col, "Value": str(value)})
         else:
-            data_list.append({"Column Header": display_col, "Value": str(value)})
+            # For fields with URLs, make them clickable
+            if isinstance(value, str) and "http" in value:
+                # Convert URLs to clickable links
+                url_pattern = r'(\[Source: (https?://[^\]]+)\])'
+                def make_clickable(match):
+                    full_text = match.group(1)
+                    url = match.group(2)
+                    return f'[<a href="{url}" target="_blank">Source</a>]'
+                
+                value_with_links = re.sub(url_pattern, make_clickable, value)
+                data_list.append({"Column Header": display_col, "Value": f'<div style="text-align: left;">{value_with_links}</div>'})
+            else:
+                data_list.append({"Column Header": display_col, "Value": str(value)})
             
     return pd.DataFrame(data_list)
 
 # --- Streamlit UI ---
 st.set_page_config(
-    page_title="Syntel BI Agent (Concise Format)",
+    page_title="Syntel BI Agent (Concise + Sources)",
     layout="wide",
     page_icon="🏢"
 )
 
 st.title("🏢 Syntel Company Data AI Agent")
-st.markdown("### 🎯 Concise Format Research")
+st.markdown("### 🎯 Concise Format with Source URLs")
 
 # Initialize session state
 if 'research_history' not in st.session_state:
@@ -337,22 +374,21 @@ if 'research_history' not in st.session_state:
 if 'company_input' not in st.session_state:
     st.session_state.company_input = "Snowman Logistics"
 
-# Display concise approach
-with st.expander("🔧 Concise Research Strategy", expanded=True):
+# Display enhanced approach
+with st.expander("🔧 Concise Research with Source URLs", expanded=True):
     st.markdown("""
-    **🎯 Short & Crisp Outputs:**
+    **🎯 Short & Crisp Outputs WITH SOURCE URLs:**
     
-    - **📋 Concise Format**: Brief, to-the-point information like your sample
-    - **🎯 Key Facts Only**: No verbose explanations or long paragraphs  
-    - **📊 Standardized Format**: Consistent output style across all fields
-    - **⚡ Faster Results**: Optimized for quick scanning and analysis
+    - **📋 Concise Format**: Brief, to-the-point information
+    - **🔗 Source URLs**: Every field includes clickable source links
+    - **🎯 Key Facts Only**: No verbose explanations
+    - **📊 Standardized Format**: Consistent output style
     
     **Output Style:**
-    - Industry: "Warehouse / Cold-chain" 
-    - Employees: "581"
-    - Expansion: "Jun 2025: Kolkata-5,630 pallets"
-    - Vendors: "Microsoft Dynamics, SAP, Oracle"
-    - Relevance: "• New warehouses need Wi-Fi for automation"
+    - Industry: "Warehouse / Cold-chain [Source: url]" 
+    - Employees: "581 [Source: url]"
+    - Expansion: "Jun 2025: Kolkata-5,630 pallets [Sources: url1, url2]"
+    - Vendors: "Microsoft Dynamics, SAP, Oracle [Source: url]"
     """)
 
 # Input section
@@ -361,7 +397,7 @@ with col1:
     company_input = st.text_input("Enter the company name to research:", st.session_state.company_input)
 with col2:
     with st.form("research_form"):
-        submitted = st.form_submit_button("🚀 Start Concise Research", type="primary")
+        submitted = st.form_submit_button("🚀 Start Research with Sources", type="primary")
 
 if submitted:
     st.session_state.company_input = company_input
@@ -375,17 +411,17 @@ if submitted:
     st.session_state.status_text = st.empty()
     
     # Show initial status
-    st.session_state.status_text.info("🚀 Starting concise research...")
+    st.session_state.status_text.info("🚀 Starting research with source URLs...")
     st.session_state.progress_bar.progress(5)
     
-    with st.spinner(f"**Researching {company_input} in concise format...**"):
+    with st.spinner(f"**Researching {company_input} with source URLs...**"):
         try:
-            # Perform concise research
-            company_data = research_concise_intelligence(company_input)
+            # Perform concise research with sources
+            company_data = research_concise_intelligence_with_sources(company_input)
             
             # Update final progress
             st.session_state.progress_bar.progress(100)
-            st.session_state.status_text.success(f"🎉 Concise Research Complete for {company_input}!")
+            st.session_state.status_text.success(f"🎉 Research Complete for {company_input}!")
             
             # Store in history
             research_entry = {
@@ -397,11 +433,11 @@ if submitted:
             
             # Display results
             st.balloons()
-            st.success("✅ All fields researched in concise format!")
+            st.success("✅ All fields researched with source URLs!")
             
             # Display final results
-            st.subheader(f"📊 Concise Business Intelligence Report for {company_input}")
-            final_df = format_concise_display(company_input, company_data)
+            st.subheader(f"📊 Business Intelligence Report for {company_input}")
+            final_df = format_concise_display_with_sources(company_input, company_data)
             st.markdown(final_df.to_html(escape=False, header=True, index=False), unsafe_allow_html=True)
             
             # Show completion metrics
@@ -410,11 +446,16 @@ if submitted:
                                     if company_data.get(field) and 
                                     company_data.get(field) != "N/A")
                 
+                fields_with_sources = sum(1 for field in REQUIRED_FIELDS[:-2]  # Exclude relevance fields
+                                       if company_data.get(field) and 
+                                       company_data.get(field) != "N/A" and
+                                       "Source" in company_data.get(field, ""))
+                
                 col1, col2, col3 = st.columns(3)
                 with col1:
                     st.metric("Fields Completed", f"{completed_fields}/{len(REQUIRED_FIELDS)}")
                 with col2:
-                    st.metric("Completion Rate", f"{(completed_fields/len(REQUIRED_FIELDS))*100:.0f}%")
+                    st.metric("Fields with Sources", f"{fields_with_sources}/{len(REQUIRED_FIELDS)-2}")
                 with col3:
                     st.metric("Intent Score", company_data.get("intent_scoring_level", "Medium"))
             
@@ -433,7 +474,7 @@ if submitted:
                  st.download_button(
                      label="Download JSON",
                      data=json.dumps(company_data, indent=2),
-                     file_name=f"{company_input.replace(' ', '_')}_concise_data.json",
+                     file_name=f"{company_input.replace(' ', '_')}_sources_data.json",
                      mime="application/json"
                  )
 
@@ -442,7 +483,7 @@ if submitted:
                  st.download_button(
                      label="Download CSV",
                      data=csv_data,
-                     file_name=f"{company_input.replace(' ', '_')}_concise_data.csv",
+                     file_name=f"{company_input.replace(' ', '_')}_sources_data.csv",
                      mime="text/csv"
                  )
                  
@@ -451,7 +492,7 @@ if submitted:
                  st.download_button(
                      label="Download Excel",
                      data=excel_data,
-                     file_name=f"{company_input.replace(' ', '_')}_concise_data.xlsx",
+                     file_name=f"{company_input.replace(' ', '_')}_sources_data.xlsx",
                      mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                  )
                         
@@ -481,8 +522,8 @@ if st.session_state.research_history:
 st.markdown("---")
 st.markdown(
     "<div style='text-align: center; color: gray;'>"
-    "🤖 Powered by Concise Format Research | "
-    "Short & Crisp Outputs | Actionable Intelligence"
+    "🤖 Powered by Concise Research with Source URLs | "
+    "Clickable Source Links | Verifiable Intelligence"
     "</div>",
     unsafe_allow_html=True
 )
