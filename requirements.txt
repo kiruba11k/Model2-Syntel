@@ -1,0 +1,9 @@
+streamlit
+pandas
+langchain-groq
+langchain-community
+langgraph
+pydantic
+tavily-python
+groq
+xlsxwriter
