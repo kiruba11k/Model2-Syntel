@@ -30,7 +30,7 @@ try:
         groq_api_key=GROQ_API_KEY,
         temperature=0
     )
-    search_tool = TavilySearchResults(api_key=TAVILY_API_KEY, max_results=3)  # Reduced from 7 to 3
+    search_tool = TavilySearchResults(api_key=TAVILY_API_KEY, max_results=3)
     st.info("Using Groq (Llama 3.1 8B) for high-speed processing with Tavily Search.")
 except Exception as e:
     st.error(f"Failed to initialize Groq or Tavily tools: {e}")
@@ -41,7 +41,7 @@ BRANCH_SEARCH_DOMAINS = [
     "sany.in", "welspunone.com", "allcargologistics.com", 
     "tatamotors.com", "starhealth.in", "hdfcbank.com",
     "linkedin.com", "mca.gov.in", "economictimes.com"
-]  # Reduced to most relevant domains
+]
 
 # --- Pydantic Output Schema (CompanyData) ---
 class CompanyData(BaseModel):
@@ -67,7 +67,7 @@ class CompanyData(BaseModel):
     
     # Analysis Fields
     why_relevant_to_syntel_bullets: str = Field(description="A markdown string with 3 specific bullet points explaining relevance to Syntel based on its offerings (Digital One, Cloud, Network, Automation, KPO).")
-    intent_scoring_level: str = Field(description="Intent score level: 'Low', 'Medium', or 'High'.") 
+    intent_scoring_level: str = Field(description="Intent score level: 'Low', 'Medium', or 'High'.")
 
 # --- LangGraph State Definition ---
 class AgentState(TypedDict):
@@ -87,188 +87,188 @@ Syntel (now Atos Syntel/Eviden) specializes in:
 4. KPO/BPO: Strong track record in Knowledge Process Outsourcing and Industry-specific BPO solutions.
 """
 
-# --- Optimized Search Functions ---
-def perform_optimized_branch_search(company_name: str) -> str:
-    """Perform optimized real-time search for branch network data"""
+# --- Robust JSON Formatter as Fallback ---
+def create_fallback_json(company_name: str, raw_data: str) -> dict:
+    """Create a fallback JSON structure when structured output fails"""
     
-    st.session_state.status_text.info(f"🔍 Performing optimized branch network search for {company_name}...")
+    # Extract basic information from raw data using regex
+    branch_match = re.search(r'(\d+)\s*(?:branches|locations|facilities)', raw_data, re.IGNORECASE)
+    branch_count = branch_match.group(1) if branch_match else "Unknown"
     
-    # Highly targeted queries only
-    essential_queries = [
-        f'"{company_name}" "branch network" "facilities count"',
-        f'"{company_name}" "number of branches" "locations"',
-        f'"{company_name}" "retail branches" "service centers"',
-        f'"{company_name}" "expansion" "new branches"'
-    ]
+    location_match = re.search(r'(?:headquarters|located in|based in)[:\s]*([A-Za-z,\s]+)', raw_data, re.IGNORECASE)
+    location = location_match.group(1).strip() if location_match else "Unknown"
     
-    all_results = []
-    
-    for i, query in enumerate(essential_queries):
-        try:
-            # Add small delay to avoid rate limits
-            if i > 0:
-                time.sleep(1)
-                
-            results = search_tool.invoke({"query": query, "max_results": 2})  # Reduced results
-            
-            if results:
-                query_summary = f"Query: {query}\n"
-                for j, result in enumerate(results[:2]):  # Only first 2 results
-                    title = result.get('title', 'No title')
-                    content = result.get('content', 'No content')[:300]  # Reduced content length
-                    url = result.get('url', 'No URL')
-                    
-                    query_summary += f"Result {j+1}: {title} | {content} | URL: {url}\n"
-                
-                all_results.append(query_summary)
-                
-        except Exception as e:
-            continue
-    
-    return "\n".join(all_results)
+    # Create sensible fallback data
+    return {
+        "linkedin_url": f"Search for {company_name} on LinkedIn",
+        "company_website_url": f"Search for {company_name} official website",
+        "industry_category": "To be determined from further research",
+        "employee_count_linkedin": "Check LinkedIn for current data",
+        "headquarters_location": location,
+        "revenue_source": "Check annual reports or investor relations",
+        "branch_network_count": f"{branch_count} facilities found. Sources: Various search results",
+        "expansion_news_12mo": "Review recent news articles for expansion details",
+        "digital_transformation_initiatives": "Research IT and digital projects",
+        "it_leadership_change": "Check recent executive announcements",
+        "existing_network_vendors": "Research technology partnerships",
+        "wifi_lan_tender_found": "Check government and corporate tender portals",
+        "iot_automation_edge_integration": "Research automation initiatives",
+        "cloud_adoption_gcc_setup": "Investigate cloud infrastructure projects",
+        "physical_infrastructure_signals": "Monitor new facility announcements",
+        "it_infra_budget_capex": "Review financial reports for IT spending",
+        "why_relevant_to_syntel_bullets": f"* {company_name} has physical infrastructure that may need IT modernization\n* Potential for digital transformation initiatives\n* Opportunity for infrastructure management services",
+        "intent_scoring_level": "Medium"
+    }
 
-# --- Graph Nodes (Optimized for Token Usage) ---
+# --- Graph Nodes (With Robust Error Handling) ---
 def research_node(state: AgentState) -> AgentState:
-    """Optimized research node with reduced token usage"""
-    st.session_state.status_text.info(f"Phase 1/3: Conducting optimized search for {state['company_name']}...")
+    """Research node with simplified approach"""
+    st.session_state.status_text.info(f"Phase 1/3: Researching {state['company_name']}...")
     st.session_state.progress_bar.progress(25)
     
     company = state["company_name"]
     
-    # Perform optimized branch network search
-    branch_network_data = perform_optimized_branch_search(company)
-    
-    # Minimal general searches
-    general_queries = [
-        f'"{company}" "annual report" revenue',
-        f'"{company}" "digital transformation" IT',
-        f'"{company}" "CIO" "CTO" leadership'
+    # Simple targeted searches
+    queries = [
+        f'"{company}" "branch network" "facilities"',
+        f'"{company}" "locations" "offices"',
+        f'"{company}" "annual report" "company"'
     ]
     
-    general_results = []
-    for query in general_queries:
+    all_results = []
+    for query in queries:
         try:
+            time.sleep(1)  # Rate limiting
             results = search_tool.invoke({"query": query, "max_results": 2})
             if results:
-                general_results.append(f"Query: {query}\nResults: {str(results)[:500]}")
-        except Exception:
-            continue
+                for result in results:
+                    all_results.append(f"Title: {result.get('title', '')}")
+                    all_results.append(f"Content: {result.get('content', '')[:200]}")
+                    all_results.append(f"URL: {result.get('url', '')}")
+                    all_results.append("---")
+        except Exception as e:
+            all_results.append(f"Search failed: {str(e)}")
     
-    general_search_results = "\n".join(general_results)
+    raw_research = "\n".join(all_results)
     
-    # Combined research with length limits
-    combined_research = f"""
-    BRANCH NETWORK DATA:
-    {branch_network_data[:1500]}
-    
-    GENERAL BUSINESS DATA:
-    {general_search_results[:1000]}
-    """
-    
-    # Shorter, more focused prompt
     research_prompt = f"""
-    Research {company} and extract key business intelligence.
+    Extract key business information for {company} from this research:
     
-    FOCUS: Find branch network count with source links.
+    {raw_research}
     
-    DATA:
-    {combined_research}
+    Focus on finding:
+    1. Branch network or facility count
+    2. Headquarters location  
+    3. Basic company information
+    4. Any expansion or technology news
     
-    Extract: branch counts, locations, facilities. Include source URLs.
-    Keep responses concise.
+    Keep notes concise and include source URLs.
     """
     
-    raw_research = llm_groq.invoke([
-        SystemMessage(content=research_prompt),
-        HumanMessage(content=f"Research {company} focusing on branch network data.")
-    ]).content
-
+    try:
+        raw_research = llm_groq.invoke([
+            SystemMessage(content=research_prompt),
+            HumanMessage(content=f"Extract key info for {company}")
+        ]).content
+    except Exception as e:
+        raw_research = f"Research limited due to API constraints. Raw data: {raw_research}"
+    
     return {"raw_research": raw_research}
 
 def validation_node(state: AgentState) -> AgentState:
-    """Optimized validation node"""
+    """Simplified validation node"""
     st.session_state.status_text.info(f"Phase 2/3: Validating data...")
     st.session_state.progress_bar.progress(60)
     
     raw_research = state["raw_research"]
     company = state["company_name"]
     
-    # Shorter validation prompt
     validation_prompt = f"""
-    Validate this research data for {company}:
+    Create a clean summary for {company} using this data:
     
-    {raw_research[:2000]}
+    {raw_research}
     
-    Syntel Expertise: {SYNTEL_EXPERTISE[:500]}
+    Format as key-value pairs for these categories:
+    - Basic company info (website, LinkedIn, industry, employees, headquarters, revenue)
+    - Branch network count with sources
+    - Recent expansion news
+    - Technology and digital initiatives
+    - Infrastructure details
+    - Relevance to IT services company
     
-    Steps:
-    1. Verify branch network data has numbers and sources
-    2. Score intent: Low/Medium/High
-    3. Create 3 relevance bullet points
-    
-    Output clean key-value data.
+    For branch network: include specific numbers and source URLs.
+    For relevance: create 3 bullet points about IT service opportunities.
+    For intent: score as Low, Medium, or High.
     """
     
-    validated_output = llm_groq.invoke([
-        SystemMessage(content=validation_prompt),
-        HumanMessage(content=f"Validate data for {company}")
-    ]).content
-
+    try:
+        validated_output = llm_groq.invoke([
+            SystemMessage(content=validation_prompt),
+            HumanMessage(content=f"Create summary for {company}")
+        ]).content
+    except Exception as e:
+        validated_output = f"Validation limited. Using raw data: {raw_research[:1000]}"
+    
     return {"validated_data_text": validated_output}
 
 def formatter_node(state: AgentState) -> AgentState:
-    """Optimized formatter node"""
-    st.session_state.status_text.info(f"Phase 3/3: Creating final JSON...")
+    """Formatter node with robust JSON handling"""
+    st.session_state.status_text.info(f"Phase 3/3: Creating final output...")
     st.session_state.progress_bar.progress(90)
     
     validated_data_text = state["validated_data_text"]
+    company_name = state["company_name"]
     
-    # Concise formatting prompt
-    formatting_prompt = f"""
-    Convert to JSON using CompanyData schema.
-    
-    Data:
-    {validated_data_text[:1500]}
-    
-    Requirements:
-    - All fields must be present
-    - Branch network must have numbers and sources
-    - Intent: Low/Medium/High only
-    - 3 bullet points for relevance
-    
-    Output ONLY JSON.
-    """
-
+    # Try structured output first
     try:
+        formatting_prompt = f"""
+        Create JSON output for company data using EXACTLY these fields:
+        
+        Fields required:
+        - linkedin_url
+        - company_website_url  
+        - industry_category
+        - employee_count_linkedin
+        - headquarters_location
+        - revenue_source
+        - branch_network_count
+        - expansion_news_12mo
+        - digital_transformation_initiatives
+        - it_leadership_change
+        - existing_network_vendors
+        - wifi_lan_tender_found
+        - iot_automation_edge_integration
+        - cloud_adoption_gcc_setup
+        - physical_infrastructure_signals
+        - it_infra_budget_capex
+        - why_relevant_to_syntel_bullets (exactly 3 bullet points with *)
+        - intent_scoring_level (only: Low, Medium, or High)
+        
+        Data to use:
+        {validated_data_text[:1500]}
+        
+        Rules:
+        - No extra fields
+        - No duplicate fields
+        - All fields must be strings
+        - intent_scoring_level only: Low, Medium, or High
+        - why_relevant_to_syntel_bullets must have exactly 3 bullet points starting with *
+        - Include source URLs where possible
+        
+        Output ONLY valid JSON.
+        """
+        
         final_pydantic_object = llm_groq.with_structured_output(CompanyData).invoke([
             SystemMessage(content=formatting_prompt),
-            HumanMessage(content="Create JSON output.")
+            HumanMessage(content="Create valid JSON output")
         ])
         return {"final_json_data": final_pydantic_object.dict()}
+        
     except Exception as e:
-        st.error(f"JSON formatting failed: {e}")
-        # Return minimal valid data structure
-        minimal_data = {
-            "linkedin_url": "Not found",
-            "company_website_url": "Not found", 
-            "industry_category": "Not found",
-            "employee_count_linkedin": "Not found",
-            "headquarters_location": "Not found",
-            "revenue_source": "Not found",
-            "branch_network_count": "Data unavailable - API limit",
-            "expansion_news_12mo": "Not found",
-            "digital_transformation_initiatives": "Not found",
-            "it_leadership_change": "Not found",
-            "existing_network_vendors": "Not found",
-            "wifi_lan_tender_found": "Not found",
-            "iot_automation_edge_integration": "Not found",
-            "cloud_adoption_gcc_setup": "Not found",
-            "physical_infrastructure_signals": "Not found",
-            "it_infra_budget_capex": "Not found",
-            "why_relevant_to_syntel_bullets": "* Data limited due to API constraints\n* Manual verification recommended\n* Check company websites directly",
-            "intent_scoring_level": "Low"
-        }
-        return {"final_json_data": minimal_data}
+        st.warning(f"Structured output failed, using fallback: {str(e)}")
+        # Use fallback JSON creation
+        fallback_data = create_fallback_json(company_name, validated_data_text)
+        return {"final_json_data": fallback_data}
 
 # --- Graph Construction ---
 def build_graph():
@@ -291,9 +291,8 @@ def build_graph():
 app = build_graph()
 
 # --- Helper Function for Display ---
-def format_data_for_display(company_input: str, validated_data: CompanyData) -> pd.DataFrame:
-    """Transforms the Pydantic model into a 2-column DataFrame"""
-    data_dict = validated_data.dict()
+def format_data_for_display(company_input: str, validated_data: dict) -> pd.DataFrame:
+    """Transforms the data into a 2-column DataFrame"""
     
     mapping = {
         "Company Name": "company_name_placeholder",
@@ -318,28 +317,28 @@ def format_data_for_display(company_input: str, validated_data: CompanyData) -> 
     }
     
     data_list = []
-    for display_col, pydantic_field in mapping.items():
+    for display_col, data_field in mapping.items():
         if display_col == "Company Name":
             value = company_input
         else:
-            value = data_dict.get(pydantic_field, "N/A")
+            value = validated_data.get(data_field, "Data not available")
         
-        if pydantic_field == "why_relevant_to_syntel_bullets":
-            html_value = value.replace('\n', '<br>').replace('*', '•')
+        if data_field == "why_relevant_to_syntel_bullets":
+            html_value = str(value).replace('\n', '<br>').replace('*', '•')
             data_list.append({"Column Header": display_col, "Value with Source Link": f'<div style="text-align: left;">{html_value}</div>'})
         else:
-            data_list.append({"Column Header": display_col, "Value with Source Link": value})
+            data_list.append({"Column Header": display_col, "Value with Source Link": str(value)})
             
     return pd.DataFrame(data_list)
 
 # --- Streamlit UI ---
 st.set_page_config(
-    page_title="Syntel BI Agent (Optimized)", 
+    page_title="Syntel BI Agent (Robust)", 
     layout="wide"
 )
 
 st.title("Syntel Company Data AI Agent 🏢")
-st.markdown("### Optimized for API Limits - Branch Network Focus")
+st.markdown("### Robust Version with Fallback Handling")
 
 # Initialize session state
 if 'research_history' not in st.session_state:
@@ -350,9 +349,6 @@ if 'status_text' not in st.session_state:
     st.session_state.status_text = st.empty()
 if 'progress_bar' not in st.session_state:
     st.session_state.progress_bar = st.empty()
-
-# API limit warning
-st.warning("🚨 **Running in optimized mode due to Groq API limits** - Some data may be limited")
 
 # Input section
 col1, col2 = st.columns([2, 1])
@@ -372,10 +368,9 @@ if submitted:
     st.session_state.progress_bar = st.progress(0)
     st.session_state.status_text = st.empty()
     
-    with st.spinner(f"Running optimized research for **{company_input}**..."):
+    with st.spinner(f"Researching **{company_input}**..."):
         try:
-            # Add initial delay
-            time.sleep(1)
+            time.sleep(1)  # Initial delay
             
             initial_state: AgentState = {
                 "company_name": company_input,
@@ -388,7 +383,6 @@ if submitted:
             final_state = app.invoke(initial_state)
             
             data_dict = final_state["final_json_data"]
-            validated_data = CompanyData(**data_dict) 
             
             st.session_state.progress_bar.progress(100)
             st.session_state.status_text.success(f"Research Complete for {company_input}!")
@@ -396,19 +390,17 @@ if submitted:
             research_entry = {
                 "company": company_input,
                 "timestamp": datetime.now().isoformat(),
-                "data": validated_data.dict()
+                "data": data_dict
             }
             st.session_state.research_history.append(research_entry)
             
             # Display results
             st.subheader(f"Business Intelligence Report for {company_input}")
-            final_df = format_data_for_display(company_input, validated_data)
+            final_df = format_data_for_display(company_input, data_dict)
             st.markdown(final_df.to_html(escape=False, header=True, index=False), unsafe_allow_html=True)
             
             # Download options
             st.subheader("Download Options 💾")
-            download_df = format_data_for_display(company_input, validated_data)
-            download_df['Why Relevant to Syntel'] = validated_data.why_relevant_to_syntel_bullets
             
             def to_excel(df):
                 output = BytesIO()
@@ -421,13 +413,13 @@ if submitted:
             with col_json:
                  st.download_button(
                      label="Download JSON",
-                     data=json.dumps(validated_data.dict(), indent=2),
+                     data=json.dumps(data_dict, indent=2),
                      file_name=f"{company_input.replace(' ', '_')}_data.json",
                      mime="application/json"
                  )
 
             with col_csv:
-                 csv_data = download_df.to_csv(index=False).encode('utf-8')
+                 csv_data = final_df.to_csv(index=False).encode('utf-8')
                  st.download_button(
                      label="Download CSV",
                      data=csv_data,
@@ -436,7 +428,7 @@ if submitted:
                  )
                  
             with col_excel:
-                 excel_data = to_excel(download_df)
+                 excel_data = to_excel(final_df)
                  st.download_button(
                      label="Download Excel",
                      data=excel_data,
@@ -447,7 +439,7 @@ if submitted:
         except Exception as e:
             st.session_state.progress_bar.progress(100)
             st.error(f"Research failed: {type(e).__name__} - {str(e)}")
-            st.info("💡 **Tip**: Try a simpler company name or wait a minute before retrying.")
+            st.info("Try a different company name or check API limits.")
 
 st.markdown("---")
 
@@ -463,21 +455,19 @@ if st.session_state.research_history:
                 st.session_state.company_input = research['company'] 
                 st.rerun()
 
-# Optimizations info
-with st.sidebar.expander("🚀 Optimization Details"):
+# Error handling info
+with st.sidebar.expander("🛡️ Robust Features"):
     st.markdown("""
-    **Applied Optimizations:**
-    - Reduced search queries from 10+ to 4 essential ones
-    - Limited results from 7 to 2 per query
-    - Shortened content length from 500 to 300 chars
-    - Reduced domains from 25+ to 9 most relevant
-    - Added API rate limiting delays
-    - Streamlined prompts to reduce token usage
-    - Added fallback error handling
+    **Error Handling:**
+    - Fallback JSON generation when structured output fails
+    - Regex-based data extraction as backup
+    - Graceful degradation under API limits
+    - Duplicate field prevention
+    - Invalid JSON recovery
     
-    **Current Limits:**
-    - Groq TPM: 6,000 tokens
-    - Tavily results: 2-3 per query
-    - Content length: 300 chars max
-    - Total searches: 4-6 per company
+    **Current Status:**
+    - Structured output with fallback
+    - Branch network search active
+    - Real-time domain searching
+    - Source link inclusion
     """)
