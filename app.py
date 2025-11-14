@@ -154,7 +154,85 @@ def validate_and_complete_data(data: dict, company_name: str) -> dict:
         )
     
     return completed_data
+def perform_tech_stack_search(company_name: str) -> str:
+    """Perform real-time search for technology stack and network vendors"""
+    
+    st.session_state.status_text.info(f"🔧 Researching technology stack for {company_name}...")
+    
+    # Technology-specific search queries
+    tech_queries = [
+        f'"{company_name}" "technology stack" "IT infrastructure" "tech stack"',
+        f'"{company_name}" "ERP system" "CRM system" "WMS" "TMS"',
+        f'"{company_name}" "cloud provider" "AWS" "Azure" "Google Cloud"',
+        f'"{company_name}" "software vendors" "technology partners"',
+        f'"{company_name}" "digital transformation" "IT systems"',
+        f'"{company_name}" "SAP" "Oracle" "Microsoft" "Cisco" "VMware"',
+        f'"{company_name}" "network infrastructure" "IT hardware"'
+    ]
+    
+    # Domain-specific searches from your list
+    tech_domains = [
+        "blogs.oracle.com", "cio.economictimes.indiatimes.com", "supplychaindigital.com",
+        "forbes.com", "microsoft.com", "sap.com", "infosys.com", "vmware.com", 
+        "cisco.com", "aws.amazon.com", "azure.microsoft.com", "cloud.google.com"
+    ]
+    
+    # Add domain-specific queries
+    for domain in tech_domains[:8]:  # Use first 8 to avoid rate limits
+        tech_queries.append(f'site:{domain} "{company_name}" technology IT system')
+    
+    all_tech_results = []
+    
+    for i, query in enumerate(tech_queries[:10]):  # Limit to 10 queries
+        try:
+            time.sleep(1)  # Rate limiting
+            results = search_tool.invoke({"query": query, "max_results": 3})
+            
+            if results:
+                query_summary = f"Tech Search: {query}\n"
+                for j, result in enumerate(results):
+                    title = result.get('title', 'No title')
+                    content = result.get('content', 'No content')[:400]
+                    url = result.get('url', 'No URL')
+                    
+                    # Look for technology mentions in content
+                    tech_indicators = extract_tech_indicators(content)
+                    
+                    query_summary += f"Result {j+1}: {title}\n"
+                    query_summary += f"Content: {content}\n"
+                    if tech_indicators:
+                        query_summary += f"Tech Mentions: {', '.join(tech_indicators)}\n"
+                    query_summary += f"URL: {url}\n\n"
+                
+                all_tech_results.append(query_summary)
+                
+        except Exception as e:
+            continue
+    
+    return "\n".join(all_tech_results)
 
+def extract_tech_indicators(text: str) -> list:
+    """Extract technology and vendor mentions from text"""
+    # Common technology vendors and systems
+    tech_patterns = [
+        r'\b(SAP|Oracle|Microsoft|IBM|Salesforce)\b',
+        r'\b(AWS|Azure|Google Cloud|cloud)\b',
+        r'\b(Cisco|VMware|Juniper|HP|Dell)\b',
+        r'\b(ERP|CRM|WMS|TMS|SCM)\b',
+        r'\b(SaaS|PaaS|IaaS|cloud computing)\b',
+        r'\b(Tableau|Power BI|analytics)\b',
+        r'\b(ServiceNow|Workday|Adobe)\b',
+        r'\b(Infosys|TCS|Wipro|HCL|Accenture)\b',
+        r'\b(SQL|database|MySQL|PostgreSQL)\b',
+        r'\b(Java|Python|\.NET|JavaScript)\b'
+    ]
+    
+    found_tech = []
+    for pattern in tech_patterns:
+        matches = re.findall(pattern, text, re.IGNORECASE)
+        found_tech.extend(matches)
+    
+    return list(set(found_tech))  # Remove duplicates
 def get_sensible_default(field: str, company_name: str) -> str:
     """Get sensible default values for missing fields"""
     
@@ -192,114 +270,118 @@ def format_relevance_bullets(raw_text: str, company_name: str) -> str:
 
 # --- Graph Nodes (Completely Rewritten) ---
 def research_node(state: AgentState) -> AgentState:
-    """Research node focused on branch network data"""
-    st.session_state.status_text.info(f"Phase 1/3: Researching {state['company_name']}...")
+    """Enhanced research node with tech stack detection"""
+    st.session_state.status_text.info(f"Phase 1/3: Comprehensive research for {state['company_name']}...")
     st.session_state.progress_bar.progress(25)
     
     company = state["company_name"]
     
-    # Focused branch network searches
-    queries = [
-        f'"{company}" branch network facilities locations',
-        f'"{company}" offices warehouses logistics centers',
-        f'"{company}" company information website'
+    # Perform all research types in parallel
+    branch_network_data = perform_optimized_branch_search(company)
+    tech_stack_data = perform_tech_stack_search(company)
+    
+    # General business searches
+    general_queries = [
+        f'"{company}" "annual report" revenue',
+        f'"{company}" "digital transformation" IT',
+        f'"{company}" "CIO" "CTO" leadership'
     ]
     
-    all_results = []
-    for query in queries:
+    general_results = []
+    for query in general_queries:
         try:
-            time.sleep(1)
             results = search_tool.invoke({"query": query, "max_results": 2})
             if results:
-                for result in results:
-                    all_results.append({
-                        "title": result.get('title', ''),
-                        "content": result.get('content', '')[:300],
-                        "url": result.get('url', '')
-                    })
-        except Exception as e:
+                general_results.append(f"Query: {query}\nResults: {str(results)[:500]}")
+        except Exception:
             continue
     
-    # Format research results
-    research_text = "SEARCH RESULTS:\n\n"
-    for i, result in enumerate(all_results):
-        research_text += f"Result {i+1}:\n"
-        research_text += f"Title: {result['title']}\n"
-        research_text += f"Content: {result['content']}\n"
-        research_text += f"URL: {result['url']}\n\n"
+    general_search_results = "\n".join(general_results)
+    
+    # Combined research data
+    combined_research = f"""
+    BRANCH NETWORK DATA:
+    {branch_network_data[:1500]}
+    
+    TECHNOLOGY STACK DATA:
+    {tech_stack_data[:1500]}
+    
+    GENERAL BUSINESS DATA:
+    {general_search_results[:1000]}
+    """
     
     research_prompt = f"""
-    Analyze this research data for {company} and extract key information.
+    Research {company} and extract comprehensive business intelligence with special focus on technology stack.
     
-    Focus on finding:
-    - Branch network count and facilities
-    - Company website and basic info  
-    - Headquarters location
-    - Industry classification
-    - Any expansion or technology news
+    CRITICAL FOCUS AREAS:
     
-    Keep responses factual and include source URLs when available.
+    1. TECHNOLOGY STACK & NETWORK VENDORS:
+       - Identify specific software systems (ERP, CRM, WMS, TMS)
+       - Find cloud providers (AWS, Azure, Google Cloud)
+       - Document hardware vendors (Cisco, Dell, HP)
+       - Note any digital transformation initiatives
+       - MUST include source URLs for all technology findings
     
-    {research_text}
+    2. BRANCH NETWORK: Facility counts and locations with sources
+    
+    3. GENERAL BUSINESS: Basic company information
+    
+    RESEARCH DATA:
+    {combined_research}
+    
+    For technology stack, be specific about vendors and systems mentioned. Include version numbers if available.
     """
     
     try:
         raw_research = llm_groq.invoke([
             SystemMessage(content=research_prompt),
-            HumanMessage(content=f"Extract key business information for {company}")
+            HumanMessage(content=f"Research {company} with technology stack focus")
         ]).content
     except Exception as e:
-        raw_research = f"Research data: {research_text}"
+        raw_research = f"Research data: {combined_research}"
     
     return {"raw_research": raw_research}
-
 def validation_node(state: AgentState) -> AgentState:
-    """Validation node that prepares data for JSON formatting"""
-    st.session_state.status_text.info(f"Phase 2/3: Preparing data structure...")
+    """Enhanced validation with tech stack verification"""
+    st.session_state.status_text.info(f"Phase 2/3: Validating data and tech stack...")
     st.session_state.progress_bar.progress(60)
     
     raw_research = state["raw_research"]
     company = state["company_name"]
     
     validation_prompt = f"""
-    Based on the research below, create a structured data summary for {company}.
+    Validate this research data for {company} with emphasis on technology stack accuracy:
     
-    RESEARCH DATA:
-    {raw_research}
+    {raw_research[:2000]}
     
-    Create a JSON-like structure with these exact fields:
-    - linkedin_url
-    - company_website_url
-    - industry_category  
-    - employee_count_linkedin
-    - headquarters_location
-    - revenue_source
-    - branch_network_count (include numbers and sources)
-    - expansion_news_12mo
-    - digital_transformation_initiatives
-    - it_leadership_change
-    - existing_network_vendors
-    - wifi_lan_tender_found
-    - iot_automation_edge_integration
-    - cloud_adoption_gcc_setup
-    - physical_infrastructure_signals
-    - it_infra_budget_capex
-    - why_relevant_to_syntel_bullets (exactly 3 bullet points starting with *)
-    - intent_scoring_level (only: Low, Medium, or High)
+    Syntel Expertise: {SYNTEL_EXPERTISE[:500]}
     
-    Format as valid JSON. Include source URLs in relevant fields.
+    VALIDATION STEPS:
+    1. TECHNOLOGY STACK VERIFICATION:
+       - Verify all technology vendors have source links
+       - Ensure specific systems are mentioned (not just categories)
+       - Cross-reference technology mentions across multiple sources
+    
+    2. INTENT SCORING: Low/Medium/High based on:
+       - High: Multiple clear technology refresh signals
+       - Medium: Some technology modernization mentions  
+       - Low: Only basic IT infrastructure mentioned
+    
+    3. RELEVANCE: Create 3 bullet points linking company's tech stack to Syntel's services
+    
+    Output clean key-value data ready for JSON conversion.
     """
     
     try:
         validated_output = llm_groq.invoke([
             SystemMessage(content=validation_prompt),
-            HumanMessage(content=f"Create structured data for {company}")
+            HumanMessage(content=f"Validate data for {company}, verify tech stack")
         ]).content
     except Exception as e:
         validated_output = raw_research
     
     return {"validated_data_text": validated_output}
-
+    
 def formatter_node(state: AgentState) -> AgentState:
     """Formatter node using manual JSON parsing"""
     st.session_state.status_text.info(f"Phase 3/3: Finalizing output...")
