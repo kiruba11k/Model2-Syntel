@@ -35,11 +35,27 @@ except Exception as e:
     st.error(f"Failed to initialize Groq or Tavily tools: {e}")
     st.stop()
 
-# --- Domain List for Branch Network Search ---
+# --- Domain Lists ---
 BRANCH_SEARCH_DOMAINS = [
     "sany.in", "welspunone.com", "allcargologistics.com", 
     "tatamotors.com", "starhealth.in", "hdfcbank.com",
     "linkedin.com", "mca.gov.in", "economictimes.com"
+]
+
+TECH_STACK_DOMAINS = [
+    "blogs.oracle.com", "cio.economictimes.indiatimes.com", "supplychaindigital.com",
+    "crownworldwide.com", "frontier-enterprise.com", "hotelmanagement-network.com",
+    "hotelwifi.com", "appsruntheworld.com", "us.nttdata.com", "forbes.com",
+    "mtdcnc.com", "microsoft.com", "sap.com", "amd.com", "videos.infosys.com",
+    "oracle.com", "infosys.com", "medicovertech.in", "icemakeindia.com",
+    "saurenergy.com", "aajenterprises.com", "techcircle.in", "indionetworks.com",
+    "birlasoft.com", "mindteck.com", "inavateapac.com", "jioworldcentre.com",
+    "vmware.com", "intellectdesign.com", "cisco.com", "prnewswire.com",
+    "industryoutlook.in", "networkcomputing.com", "crn.in", "builtwith.com",
+    "wappalyzer.com", "stackshare.io", "linkedin.com", "indeed.com",
+    "naukri.com", "monster.com", "censys.io", "shodan.io", "github.com",
+    "sec.gov", "bseindia.com", "nseindia.com", "aws.amazon.com",
+    "azure.microsoft.com", "cloud.google.com", "g2.com", "gartner.com"
 ]
 
 # --- Manual JSON Schema Definition ---
@@ -71,89 +87,43 @@ Syntel specializes in:
 4. KPO/BPO: Industry-specific solutions
 """
 
-# --- Manual JSON Parser and Validator ---
-def parse_and_validate_json(json_string: str, company_name: str) -> dict:
-    """Manually parse and validate JSON output from LLM"""
+# --- Search Functions ---
+def perform_optimized_branch_search(company_name: str) -> str:
+    """Perform real-time search for branch network data"""
     
-    # First, try to extract JSON from the response
-    json_match = re.search(r'\{.*\}', json_string, re.DOTALL)
-    if json_match:
-        json_str = json_match.group(0)
-    else:
-        json_str = json_string
+    st.session_state.status_text.info(f"🔍 Researching branch network for {company_name}...")
     
-    # Clean the JSON string
-    json_str = re.sub(r'</?function.*?>', '', json_str)  # Remove function tags
-    json_str = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', json_str)  # Remove control characters
-    
-    try:
-        # Try to parse as JSON
-        data = json.loads(json_str)
-    except json.JSONDecodeError:
-        # If JSON parsing fails, create structured data manually
-        data = create_structured_data_from_text(json_string, company_name)
-    
-    # Ensure all required fields are present
-    return validate_and_complete_data(data, company_name)
-
-def create_structured_data_from_text(text: str, company_name: str) -> dict:
-    """Create structured data by extracting information from text using patterns"""
-    
-    data = {}
-    
-    # Extract branch network information
-    branch_patterns = [
-        r'branch_network_count[:\s]*["\']?([^"\',}]+)',
-        r'branches?[:\s]*(\d+)',
-        r'facilit(y|ies)[:\s]*(\d+)',
-        r'locations?[:\s]*(\d+)'
+    branch_queries = [
+        f'"{company_name}" "branch network" "facilities" "locations"',
+        f'"{company_name}" "offices" "warehouses" "logistics centers"',
+        f'"{company_name}" "expansion" "new branches"'
     ]
     
-    for pattern in branch_patterns:
-        matches = re.findall(pattern, text, re.IGNORECASE)
-        if matches:
-            data["branch_network_count"] = f"Found {matches[0][0] if matches[0][0] else matches[0][1]} facilities. Source: Search results"
-            break
-    else:
-        data["branch_network_count"] = "Facility count not specified in available data"
+    all_branch_results = []
     
-    # Extract headquarters
-    hq_match = re.search(r'headquarters?[:\s]*["\']?([^"\',}]+)', text, re.IGNORECASE)
-    data["headquarters_location"] = hq_match.group(1).strip() if hq_match else "Information not found"
+    for i, query in enumerate(branch_queries):
+        try:
+            time.sleep(1)  # Rate limiting
+            results = search_tool.invoke({"query": query, "max_results": 3})
+            
+            if results:
+                query_summary = f"Branch Search: {query}\n"
+                for j, result in enumerate(results):
+                    title = result.get('title', 'No title')
+                    content = result.get('content', 'No content')[:400]
+                    url = result.get('url', 'No URL')
+                    
+                    query_summary += f"Result {j+1}: {title}\n"
+                    query_summary += f"Content: {content}\n"
+                    query_summary += f"URL: {url}\n\n"
+                
+                all_branch_results.append(query_summary)
+                
+        except Exception as e:
+            continue
     
-    # Extract website
-    website_match = re.search(r'website[:\s]*["\']?([^"\',}]+)', text, re.IGNORECASE)
-    data["company_website_url"] = website_match.group(1).strip() if website_match else f"Search for {company_name} website"
-    
-    # Extract industry
-    industry_match = re.search(r'industry[:\s]*["\']?([^"\',}]+)', text, re.IGNORECASE)
-    data["industry_category"] = industry_match.group(1).strip() if industry_match else "Industry classification pending"
-    
-    return data
+    return "\n".join(all_branch_results)
 
-def validate_and_complete_data(data: dict, company_name: str) -> dict:
-    """Ensure all required fields are present with sensible defaults"""
-    
-    completed_data = {}
-    
-    for field in REQUIRED_FIELDS:
-        if field in data and data[field] and data[field] != "Not specified":
-            completed_data[field] = str(data[field])
-        else:
-            # Provide sensible defaults for missing fields
-            completed_data[field] = get_sensible_default(field, company_name)
-    
-    # Ensure intent scoring is valid
-    if completed_data["intent_scoring_level"] not in ["Low", "Medium", "High"]:
-        completed_data["intent_scoring_level"] = "Medium"
-    
-    # Ensure relevance bullets are properly formatted
-    if not completed_data["why_relevant_to_syntel_bullets"].startswith('*'):
-        completed_data["why_relevant_to_syntel_bullets"] = format_relevance_bullets(
-            completed_data["why_relevant_to_syntel_bullets"], company_name
-        )
-    
-    return completed_data
 def perform_tech_stack_search(company_name: str) -> str:
     """Perform real-time search for technology stack and network vendors"""
     
@@ -170,15 +140,8 @@ def perform_tech_stack_search(company_name: str) -> str:
         f'"{company_name}" "network infrastructure" "IT hardware"'
     ]
     
-    # Domain-specific searches from your list
-    tech_domains = [
-        "blogs.oracle.com", "cio.economictimes.indiatimes.com", "supplychaindigital.com",
-        "forbes.com", "microsoft.com", "sap.com", "infosys.com", "vmware.com", 
-        "cisco.com", "aws.amazon.com", "azure.microsoft.com", "cloud.google.com"
-    ]
-    
-    # Add domain-specific queries
-    for domain in tech_domains[:8]:  # Use first 8 to avoid rate limits
+    # Add domain-specific queries from your list
+    for domain in TECH_STACK_DOMAINS[:8]:  # Use first 8 to avoid rate limits
         tech_queries.append(f'site:{domain} "{company_name}" technology IT system')
     
     all_tech_results = []
@@ -233,6 +196,98 @@ def extract_tech_indicators(text: str) -> list:
         found_tech.extend(matches)
     
     return list(set(found_tech))  # Remove duplicates
+
+# --- Manual JSON Parser and Validator ---
+def parse_and_validate_json(json_string: str, company_name: str) -> dict:
+    """Manually parse and validate JSON output from LLM"""
+    
+    # First, try to extract JSON from the response
+    json_match = re.search(r'\{.*\}', json_string, re.DOTALL)
+    if json_match:
+        json_str = json_match.group(0)
+    else:
+        json_str = json_string
+    
+    # Clean the JSON string
+    json_str = re.sub(r'</?function.*?>', '', json_str)  # Remove function tags
+    json_str = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', json_str)  # Remove control characters
+    
+    try:
+        # Try to parse as JSON
+        data = json.loads(json_str)
+    except json.JSONDecodeError:
+        # If JSON parsing fails, create structured data manually
+        data = create_structured_data_from_text(json_string, company_name)
+    
+    # Ensure all required fields are present
+    return validate_and_complete_data(data, company_name)
+
+def create_structured_data_from_text(text: str, company_name: str) -> dict:
+    """Create structured data by extracting information from text using patterns"""
+    
+    data = {}
+    
+    # Extract branch network information
+    branch_patterns = [
+        r'branch_network_count[:\s]*["\']?([^"\',}]+)',
+        r'branches?[:\s]*(\d+)',
+        r'facilit(y|ies)[:\s]*(\d+)',
+        r'locations?[:\s]*(\d+)'
+    ]
+    
+    for pattern in branch_patterns:
+        matches = re.findall(pattern, text, re.IGNORECASE)
+        if matches:
+            data["branch_network_count"] = f"Found {matches[0][0] if matches[0][0] else matches[0][1]} facilities. Source: Search results"
+            break
+    else:
+        data["branch_network_count"] = "Facility count not specified in available data"
+    
+    # Extract technology stack information
+    tech_indicators = extract_tech_indicators(text)
+    if tech_indicators:
+        data["existing_network_vendors"] = f"Technologies mentioned: {', '.join(tech_indicators)}. Source: Technology search results"
+    else:
+        data["existing_network_vendors"] = "Technology stack information being researched"
+    
+    # Extract headquarters
+    hq_match = re.search(r'headquarters?[:\s]*["\']?([^"\',}]+)', text, re.IGNORECASE)
+    data["headquarters_location"] = hq_match.group(1).strip() if hq_match else "Information not found"
+    
+    # Extract website
+    website_match = re.search(r'website[:\s]*["\']?([^"\',}]+)', text, re.IGNORECASE)
+    data["company_website_url"] = website_match.group(1).strip() if website_match else f"Search for {company_name} website"
+    
+    # Extract industry
+    industry_match = re.search(r'industry[:\s]*["\']?([^"\',}]+)', text, re.IGNORECASE)
+    data["industry_category"] = industry_match.group(1).strip() if industry_match else "Industry classification pending"
+    
+    return data
+
+def validate_and_complete_data(data: dict, company_name: str) -> dict:
+    """Ensure all required fields are present with sensible defaults"""
+    
+    completed_data = {}
+    
+    for field in REQUIRED_FIELDS:
+        if field in data and data[field] and data[field] != "Not specified":
+            completed_data[field] = str(data[field])
+        else:
+            # Provide sensible defaults for missing fields
+            completed_data[field] = get_sensible_default(field, company_name)
+    
+    # Ensure intent scoring is valid
+    if completed_data["intent_scoring_level"] not in ["Low", "Medium", "High"]:
+        completed_data["intent_scoring_level"] = "Medium"
+    
+    # Ensure relevance bullets are properly formatted
+    if not completed_data["why_relevant_to_syntel_bullets"].startswith('*'):
+        completed_data["why_relevant_to_syntel_bullets"] = format_relevance_bullets(
+            completed_data["why_relevant_to_syntel_bullets"], company_name
+        )
+    
+    return completed_data
+
 def get_sensible_default(field: str, company_name: str) -> str:
     """Get sensible default values for missing fields"""
     
@@ -268,7 +323,7 @@ def format_relevance_bullets(raw_text: str, company_name: str) -> str:
     ]
     return "\n".join(bullets)
 
-# --- Graph Nodes (Completely Rewritten) ---
+# --- Graph Nodes ---
 def research_node(state: AgentState) -> AgentState:
     """Enhanced research node with tech stack detection"""
     st.session_state.status_text.info(f"Phase 1/3: Comprehensive research for {state['company_name']}...")
@@ -276,7 +331,7 @@ def research_node(state: AgentState) -> AgentState:
     
     company = state["company_name"]
     
-    # Perform all research types in parallel
+    # Perform all research types
     branch_network_data = perform_optimized_branch_search(company)
     tech_stack_data = perform_tech_stack_search(company)
     
@@ -341,6 +396,7 @@ def research_node(state: AgentState) -> AgentState:
         raw_research = f"Research data: {combined_research}"
     
     return {"raw_research": raw_research}
+
 def validation_node(state: AgentState) -> AgentState:
     """Enhanced validation with tech stack verification"""
     st.session_state.status_text.info(f"Phase 2/3: Validating data and tech stack...")
@@ -381,7 +437,7 @@ def validation_node(state: AgentState) -> AgentState:
         validated_output = raw_research
     
     return {"validated_data_text": validated_output}
-    
+
 def formatter_node(state: AgentState) -> AgentState:
     """Formatter node using manual JSON parsing"""
     st.session_state.status_text.info(f"Phase 3/3: Finalizing output...")
@@ -436,7 +492,7 @@ def format_data_for_display(company_input: str, data_dict: dict) -> pd.DataFrame
         "Expansion News (Last 12 Months)": "expansion_news_12mo",
         "Digital Transformation Initiatives": "digital_transformation_initiatives",
         "IT Leadership Change": "it_leadership_change",
-        "Existing Network Vendors": "existing_network_vendors",
+        "Existing Network Vendors / Tech Stack": "existing_network_vendors",
         "Wi-Fi/LAN Tender Found": "wifi_lan_tender_found",
         "IoT/Automation/Edge": "iot_automation_edge_integration",
         "Cloud Adoption/GCC": "cloud_adoption_gcc_setup",
@@ -463,12 +519,12 @@ def format_data_for_display(company_input: str, data_dict: dict) -> pd.DataFrame
 
 # --- Streamlit UI ---
 st.set_page_config(
-    page_title="Syntel BI Agent (Manual JSON)", 
+    page_title="Syntel BI Agent (Tech Stack Enhanced)", 
     layout="wide"
 )
 
 st.title("Syntel Company Data AI Agent 🏢")
-st.markdown("### Manual JSON Processing - No Structured Output")
+st.markdown("### Enhanced with Technology Stack Detection")
 
 # Initialize session state
 if 'research_history' not in st.session_state:
@@ -498,7 +554,7 @@ if submitted:
     st.session_state.progress_bar = st.progress(0)
     st.session_state.status_text = st.empty()
     
-    with st.spinner(f"Researching **{company_input}** with manual JSON processing..."):
+    with st.spinner(f"Researching **{company_input}** with enhanced tech stack detection..."):
         try:
             time.sleep(1)
             
@@ -528,10 +584,10 @@ if submitted:
             final_df = format_data_for_display(company_input, data_dict)
             st.markdown(final_df.to_html(escape=False, header=True, index=False), unsafe_allow_html=True)
             
-            # Show branch network status
-            branch_data = data_dict.get("branch_network_count", "")
-            if any(keyword in branch_data.lower() for keyword in ["facility", "branch", "location", "office"]):
-                st.success("✅ Branch network data included in report")
+            # Show tech stack status
+            tech_data = data_dict.get("existing_network_vendors", "")
+            if any(keyword in tech_data.lower() for keyword in ["aws", "azure", "sap", "oracle", "cisco", "microsoft"]):
+                st.success("✅ Technology stack data detected in report")
             
             # Download options
             st.subheader("Download Options 💾")
@@ -584,25 +640,25 @@ if st.session_state.research_history:
         
         with st.sidebar.expander(f"**{research['company']}** - {research['timestamp'][:10]}", expanded=False):
             st.write(f"Intent Score: {research['data'].get('intent_scoring_level', 'N/A')}")
-            branch_info = research['data'].get('branch_network_count', 'No data')[:80]
-            st.write(f"Branch Network: {branch_info}...")
+            tech_info = research['data'].get('existing_network_vendors', 'No data')[:80]
+            st.write(f"Tech Stack: {tech_info}...")
             if st.button(f"Load {research['company']}", key=f"load_{original_index}"):
                 st.session_state.company_input = research['company'] 
                 st.rerun()
 
-# Technical info
-with st.sidebar.expander("🔧 Technical Approach"):
+# Tech stack info
+with st.sidebar.expander("🔧 Tech Stack Detection"):
     st.markdown("""
-    **Manual JSON Processing:**
-    - No structured output calls
-    - Regex-based JSON extraction
-    - Manual field validation
-    - Fallback data completion
-    - No Pydantic validation errors
+    **Technology Focus:**
+    - ERP Systems (SAP, Oracle, Microsoft)
+    - Cloud Platforms (AWS, Azure, Google)
+    - Networking (Cisco, VMware, Juniper)
+    - Software Vendors and Partners
     
-    **Branch Network Focus:**
-    - Targeted facility searches
-    - Domain-specific queries
-    - Real-time data extraction
-    - Source URL inclusion
+    **Search Domains:**
+    - Technology blogs and news sites
+    - Company press releases
+    - Industry reports
+    - Vendor case studies
+    - IT publications
     """)
