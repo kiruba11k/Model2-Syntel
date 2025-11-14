@@ -36,13 +36,14 @@ except Exception as e:
     st.stop()
 
 # --- Domain List for Branch Network Search ---
+# Kept original
 BRANCH_SEARCH_DOMAINS = [
     "sany.in", "welspunone.com", "allcargologistics.com", 
     "tatamotors.com", "starhealth.in", "hdfcbank.com",
     "linkedin.com", "mca.gov.in", "economictimes.com"
 ]
 
-# --- NEW: Domain List for Existing Network Vendors / Tech Stack Search ---
+# --- NEW: Domain List for Existing Network Vendors / Tech Stack Search (Full list retained) ---
 TECH_VENDOR_DOMAINS = [
     "blogs.oracle.com", "cio.economictimes.indiatimes.com", "supplychaindigital.com", 
     "crownworldwide.com", "frontier-enterprise.com", "hotelmanagement-network.com", 
@@ -54,7 +55,7 @@ TECH_VENDOR_DOMAINS = [
     "vmware.com", "intellectdesign.com", "cisco.com", "prnewswire.com", 
     "industryoutlook.in", "networkcomputing.com", "crn.in", 
     
-    # Tool/Tech Stack Detection Sites (use judiciously as they might require premium/API)
+    # Tool/Tech Stack Detection Sites (use judiciously)
     "builtwith.com", "wappalyzer.com", "stackshare.io", 
 
     # General Search & Financial/Gov Sites
@@ -93,9 +94,9 @@ Syntel specializes in:
 4. KPO/BPO: Industry-specific solutions
 """
 
-# --- Manual JSON Parser and Validator (CLEANUP ADDED) ---
+# --- Manual JSON Parser and Validator (CRITICAL FIX HERE) ---
 def parse_and_validate_json(json_string: str, company_name: str) -> dict:
-    """Manually parse and validate JSON output from LLM, with list cleanup"""
+    """Manually parse and validate JSON output from LLM, with robust list/dict cleanup"""
     
     # First, try to extract JSON from the response
     json_match = re.search(r'\{.*\}', json_string, re.DOTALL)
@@ -115,26 +116,32 @@ def parse_and_validate_json(json_string: str, company_name: str) -> dict:
         # If JSON parsing fails, create structured data manually
         data = create_structured_data_from_text(json_string, company_name)
     
-    # --- CRITICAL CLEANUP: Convert any JSON list values to a clean string ---
+    # --- CRITICAL CLEANUP: Convert any JSON list or dict values to a clean string ---
     for key, value in data.items():
         if isinstance(value, list):
             # Attempt to convert list of strings/dicts into a semi-colon separated string
-            data[key] = "; ".join([str(item) for item in value])
+            # Handle the specific case of the list containing dictionaries (e.g., from your sample output)
+            clean_list = []
+            for item in value:
+                if isinstance(item, dict):
+                    # For dicts, convert to a readable string format like "key: value"
+                    clean_list.append(" ".join(f"{k}: {v}" for k, v in item.items()))
+                else:
+                    clean_list.append(str(item).strip())
+            data[key] = "; ".join(clean_list).replace("'", "") # Remove single quotes from stringified items
         
-        # Also clean up fields that look like Python dictionaries (e.g., {'count': 44, 'source': '...'}), 
-        # which the LLM occasionally outputs for fields that should be strings.
-        if key in ["branch_network_count", "expansion_news_12mo", "digital_transformation_initiatives"] and isinstance(data[key], dict):
-            # Simple conversion of dict to string representation
-            data[key] = str(data[key])
+        # Also clean up fields that look like Python dictionaries
+        elif isinstance(value, dict):
+             # Convert dict to a readable string representation
+            data[key] = "; ".join(f"{k}: {v}" for k, v in value.items()).replace("'", "")
 
 
     # Ensure all required fields are present
     return validate_and_complete_data(data, company_name)
 
-# create_structured_data_from_text (No change needed)
 def create_structured_data_from_text(text: str, company_name: str) -> dict:
     """Create structured data by extracting information from text using patterns"""
-    # ... (function body remains the same)
+    
     data = {}
     
     # Extract branch network information
@@ -148,6 +155,7 @@ def create_structured_data_from_text(text: str, company_name: str) -> dict:
     for pattern in branch_patterns:
         matches = re.findall(pattern, text, re.IGNORECASE)
         if matches:
+            # Note: This is now a simple string, which will be processed by the cleanup step if needed.
             data["branch_network_count"] = f"Found {matches[0][0] if matches[0][0] else matches[0][1]} facilities. Source: Search results"
             break
     else:
@@ -159,7 +167,7 @@ def create_structured_data_from_text(text: str, company_name: str) -> dict:
     
     # Extract website
     website_match = re.search(r'website[:\s]*["\']?([^"\',}]+)', text, re.IGNORECASE)
-    data["company_website_url"] = website_match.group(1).strip() if website_match else f"Search for {company_name} website"
+    data["company_website_url"] = website_match.group(1).strip() if website_match else f"Search for {company_name} official website"
     
     # Extract industry
     industry_match = re.search(r'industry[:\s]*["\']?([^"\',}]+)', text, re.IGNORECASE)
@@ -167,10 +175,9 @@ def create_structured_data_from_text(text: str, company_name: str) -> dict:
     
     return data
 
-# validate_and_complete_data (No change needed)
 def validate_and_complete_data(data: dict, company_name: str) -> dict:
     """Ensure all required fields are present with sensible defaults"""
-    # ... (function body remains the same)
+    
     completed_data = {}
     
     for field in REQUIRED_FIELDS:
@@ -192,10 +199,9 @@ def validate_and_complete_data(data: dict, company_name: str) -> dict:
     
     return completed_data
 
-# get_sensible_default (No change needed)
 def get_sensible_default(field: str, company_name: str) -> str:
     """Get sensible default values for missing fields"""
-    # ... (function body remains the same)
+    
     defaults = {
         "linkedin_url": f"https://linkedin.com/company/{company_name.replace(' ', '-').lower()}",
         "company_website_url": f"Search for {company_name} official website",
@@ -219,10 +225,8 @@ def get_sensible_default(field: str, company_name: str) -> str:
     
     return defaults.get(field, "Data not available")
 
-# format_relevance_bullets (No change needed)
 def format_relevance_bullets(raw_text: str, company_name: str) -> str:
     """Format relevance bullets properly"""
-    # ... (function body remains the same)
     bullets = [
         f"* {company_name} shows potential for infrastructure modernization",
         f"* Digital transformation opportunities in current operations", 
@@ -230,7 +234,7 @@ def format_relevance_bullets(raw_text: str, company_name: str) -> str:
     ]
     return "\n".join(bullets)
 
-# --- Graph Nodes (Updated research_node and validation_node) ---
+# --- Graph Nodes (Optimized research_node) ---
 def research_node(state: AgentState) -> AgentState:
     """Research node focused on branch network and tech stack data"""
     st.session_state.status_text.info(f"Phase 1/3: Researching {state['company_name']}...")
@@ -240,18 +244,20 @@ def research_node(state: AgentState) -> AgentState:
     
     # 1. Targeted branch network searches (Original logic)
     branch_queries = [
-        f'"{company}" branch network facilities locations site:{" OR site:".join(BRANCH_SEARCH_DOMAINS[:5])}',
+        f'"{company}" branch network facilities locations site:{" OR site:".join(BRANCH_SEARCH_DOMAINS[:5])}', 
         f'"{company}" offices warehouses logistics centers',
         f'"{company}" company information website'
     ]
     
-    # 2. Targeted tech stack searches (IMPROVED LOGIC)
-    # Added common tech terms like 'ERP', 'WMS', and 'Cloud' to improve focus
-    tech_stack_keywords = ["network vendors", "tech stack", "IT infrastructure", "ERP system", "WMS system", "Cisco", "VMware", "AWS", "Azure", "SAP", "Oracle"]
+    # 2. Targeted tech stack searches (IMPROVED INCLUSION)
+    # Inject the entire massive domain list to force results from those sites
+    tech_stack_keywords = ["network vendors", "tech stack", "IT infrastructure", "ERP system", "WMS system", "Cisco", "VMware", "AWS", "SAP", "Oracle"]
     
     tech_stack_queries = [
-        f'"{company}" {" OR ".join(tech_stack_keywords)} site:{" OR site:".join(TECH_VENDOR_DOMAINS[:10])}', # Focus on high-value domains
-        f'builtwith {company} OR wappalyzer {company} OR stackshare {company}', # Specific tool searches
+        # Use a high-density, focused query for vendors/tech stack against the new domains
+        f'"{company}" {" OR ".join(tech_stack_keywords[:5])} site:{" OR site:".join(TECH_VENDOR_DOMAINS)}',
+        f'"{company}" "digital transformation" site:{" OR site:".join(TECH_VENDOR_DOMAINS[:10])}', # Less aggressive search
+        f'"{company}" "vendor agreement" OR "tech partnership" site:{" OR site:".join(TECH_VENDOR_DOMAINS[10:20])}'
     ]
     
     all_queries = branch_queries + tech_stack_queries
@@ -281,16 +287,17 @@ def research_node(state: AgentState) -> AgentState:
         research_text += f"Content: {result['content']}\n"
         research_text += f"URL: {result['url']}\n\n"
     
+    # Reverting to less restrictive prompt to encourage more data
     research_prompt = f"""
-    Analyze this research data for {company} and extract key information.
+    Analyze all the research data for {company} and extract every piece of key information.
     
-    Focus on finding and providing sources (URL) for:
+    Focus on finding:
     - Branch network count and facilities
     - Company website and basic info  
     - Headquarters location
     - Industry classification
-    - **Existing Network Vendors / Tech Stack (VERY IMPORTANT: Extract actual vendor names and technology stack components with their source URL)**
-    - Any expansion or technology news
+    - **Existing Network Vendors / Tech Stack** (List every known vendor and associated tech/source link)
+    - Any expansion or technology news, digital initiatives, and leadership changes.
     
     Keep responses factual and include source URLs when available.
     
@@ -308,7 +315,7 @@ def research_node(state: AgentState) -> AgentState:
     return {"raw_research": raw_research}
 
 def validation_node(state: AgentState) -> AgentState:
-    """Validation node that prepares data for JSON formatting"""
+    """Validation node that prepares data for JSON formatting (Original logic restored, with key prompt emphasis)"""
     st.session_state.status_text.info(f"Phase 2/3: Preparing data structure...")
     st.session_state.progress_bar.progress(60)
     
@@ -321,18 +328,19 @@ def validation_node(state: AgentState) -> AgentState:
     RESEARCH DATA:
     {raw_research}
     
-    Create a JSON-like structure with these exact fields:
+    Create a JSON-like structure with these exact fields. For fields like branch_network_count, expansion_news_12mo, digital_transformation_initiatives, and existing_network_vendors, provide the value as a single, readable string that includes all relevant sources.
+    
     - linkedin_url
     - company_website_url
     - industry_category  
     - employee_count_linkedin
     - headquarters_location
     - revenue_source
-    - branch_network_count (MUST be a simple string. E.g., '44 facilities [Source: URL]')
-    - expansion_news_12mo (MUST be a simple string. E.g., 'Expanded to 44 warehouses [Source: URL]')
-    - digital_transformation_initiatives (MUST be a simple string, semicolon separated. E.g., 'ERP upgrade; Cloud adoption project')
-    - it_leadership_change (MUST be a simple string)
-    - **existing_network_vendors (MUST be a single string, semicolon separated. E.g., 'Cisco networking (Source: URL); SAP ERP (Source: URL); AWS Cloud (Source: URL)')**
+    - branch_network_count (MUST include numbers and sources)
+    - expansion_news_12mo
+    - digital_transformation_initiatives
+    - it_leadership_change
+    - **existing_network_vendors (Vendor/Tech Stack Name AND source link. List as a single, semicolon-separated string: 'Cisco networking (Source: URL); SAP ERP (Source: URL)')**
     - wifi_lan_tender_found
     - iot_automation_edge_integration
     - cloud_adoption_gcc_setup
@@ -340,8 +348,6 @@ def validation_node(state: AgentState) -> AgentState:
     - it_infra_budget_capex
     - why_relevant_to_syntel_bullets (exactly 3 bullet points starting with *)
     - intent_scoring_level (only: Low, Medium, or High)
-    
-    **CRITICAL INSTRUCTION:** Do not use Python list formatting (`[...]`) or nested JSON (`{...}`) for any field *except* the outer dictionary. Provide all values as simple strings that match the specified examples.
     
     Format as valid JSON.
     """
@@ -364,7 +370,7 @@ def formatter_node(state: AgentState) -> AgentState:
     validated_data_text = state["validated_data_text"]
     company_name = state["company_name"]
     
-    # Use our manual JSON parser instead of structured output
+    # Use our manual JSON parser instead of structured output (This includes the cleanup fix!)
     try:
         final_data = parse_and_validate_json(validated_data_text, company_name)
         st.success("✅ Data successfully structured")
@@ -374,7 +380,7 @@ def formatter_node(state: AgentState) -> AgentState:
     
     return {"final_json_data": final_data}
 
-# --- Graph Construction ---
+# --- Graph Construction (No change required) ---
 def build_graph():
     """Builds and compiles the sequential LangGraph workflow."""
     workflow = StateGraph(AgentState)
@@ -394,7 +400,7 @@ def build_graph():
 # Build the graph once
 app = build_graph()
 
-# --- Display Functions (No change required) ---
+# --- Display Functions (Updated header for clarity) ---
 def format_data_for_display(company_input: str, data_dict: dict) -> pd.DataFrame:
     """Transform data into display format"""
     
@@ -435,7 +441,7 @@ def format_data_for_display(company_input: str, data_dict: dict) -> pd.DataFrame
             
     return pd.DataFrame(data_list)
 
-# --- Streamlit UI ---
+# --- Streamlit UI (No change required) ---
 st.set_page_config(
     page_title="Syntel BI Agent (Manual JSON)", 
     layout="wide"
@@ -567,9 +573,8 @@ if st.session_state.research_history:
 # Technical info
 with st.sidebar.expander("🔧 Technical Approach"):
     st.markdown("""
-    **Manual JSON Processing:**
-    - No structured output calls
-    - **CRITICAL:** Added code to automatically convert unwanted JSON lists/dicts to strings upon parsing (`parse_and_validate_json`).
-    - **CRITICAL:** Stricter validation prompt in `validation_node` to prevent list/dict formatting for string fields.
-    - **CRITICAL:** Improved tech-stack search queries in `research_node` using terms like 'ERP', 'WMS', 'Cloud'.
+    **Manual JSON Processing (Now Stable):**
+    - **CRITICAL:** Implemented robust Python code in `parse_and_validate_json` to automatically convert Python lists (`[...]`) and dictionaries (`{...}`) into simple, semicolon-separated strings. **This fixes the ugly output format.**
+    - **Search Optimization:** The new, large list of domains is aggressively injected into the `research_node` queries to maximize the chances of finding technology-specific articles for the **Existing Network Vendors / Tech Stack** field.
+    - **Prompt Refinement:** The `validation_node` prompt is less restrictive overall but still strongly emphasizes the required format (Vendor/Tech Stack and Source Link) for the key field.
     """)
