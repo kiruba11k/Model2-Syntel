@@ -7,8 +7,6 @@ from typing import TypedDict, Annotated, List, Dict
 from io import BytesIO
 from datetime import datetime
 import time
-import asyncio
-from concurrent.futures import ThreadPoolExecutor
 
 # LangGraph and LangChain imports
 from langgraph.graph import StateGraph, START, END
@@ -163,8 +161,12 @@ def perform_targeted_search(queries: list, preferred_domains: list = None) -> st
 # --- Specialized Research Agents with Detailed Field Extraction ---
 def basic_info_agent(state: AgentState) -> AgentState:
     """Specialized agent for basic company information"""
-    st.session_state.status_text.info("🔍 Researching basic company information...")
-    st.session_state.progress_bar.progress(10)
+    # Use direct Streamlit components instead of session state
+    status_placeholder = st.empty()
+    progress_placeholder = st.empty()
+    
+    status_placeholder.info("🔍 Researching basic company information...")
+    progress_placeholder.progress(10)
     
     company = state["company_name"]
     
@@ -220,6 +222,10 @@ def basic_info_agent(state: AgentState) -> AgentState:
             "revenue_source": "Research in progress"
         }
     
+    # Clear placeholders
+    status_placeholder.empty()
+    progress_placeholder.empty()
+    
     return {
         "basic_info_complete": True,
         "basic_info_data": basic_data
@@ -227,8 +233,11 @@ def basic_info_agent(state: AgentState) -> AgentState:
 
 def network_vendors_agent(state: AgentState) -> AgentState:
     """Specialized agent for existing network vendors and tech stack"""
-    st.session_state.status_text.info("🖧 Researching network vendors and tech stack...")
-    st.session_state.progress_bar.progress(20)
+    status_placeholder = st.empty()
+    progress_placeholder = st.empty()
+    
+    status_placeholder.info("🖧 Researching network vendors and tech stack...")
+    progress_placeholder.progress(20)
     
     company = state["company_name"]
     
@@ -277,6 +286,9 @@ def network_vendors_agent(state: AgentState) -> AgentState:
     except Exception as e:
         vendor_data = {"existing_network_vendors": "Research in progress"}
     
+    status_placeholder.empty()
+    progress_placeholder.empty()
+    
     return {
         "network_vendors_complete": True,
         "network_vendors_data": vendor_data
@@ -284,8 +296,11 @@ def network_vendors_agent(state: AgentState) -> AgentState:
 
 def wifi_tender_agent(state: AgentState) -> AgentState:
     """Specialized agent for WiFi/LAN tenders and upgrades"""
-    st.session_state.status_text.info("📡 Researching WiFi/LAN tenders and upgrades...")
-    st.session_state.progress_bar.progress(30)
+    status_placeholder = st.empty()
+    progress_placeholder = st.empty()
+    
+    status_placeholder.info("📡 Researching WiFi/LAN tenders and upgrades...")
+    progress_placeholder.progress(30)
     
     company = state["company_name"]
     
@@ -332,6 +347,9 @@ def wifi_tender_agent(state: AgentState) -> AgentState:
     except Exception as e:
         wifi_data = {"wifi_lan_tender_found": "Research in progress"}
     
+    status_placeholder.empty()
+    progress_placeholder.empty()
+    
     return {
         "wifi_tender_complete": True,
         "wifi_tender_data": wifi_data
@@ -339,8 +357,11 @@ def wifi_tender_agent(state: AgentState) -> AgentState:
 
 def iot_automation_agent(state: AgentState) -> AgentState:
     """Specialized agent for IoT/Automation/Edge integration"""
-    st.session_state.status_text.info("🤖 Researching IoT and automation initiatives...")
-    st.session_state.progress_bar.progress(40)
+    status_placeholder = st.empty()
+    progress_placeholder = st.empty()
+    
+    status_placeholder.info("🤖 Researching IoT and automation initiatives...")
+    progress_placeholder.progress(40)
     
     company = state["company_name"]
     
@@ -386,6 +407,9 @@ def iot_automation_agent(state: AgentState) -> AgentState:
     except Exception as e:
         iot_data = {"iot_automation_edge_integration": "Research in progress"}
     
+    status_placeholder.empty()
+    progress_placeholder.empty()
+    
     return {
         "iot_automation_complete": True,
         "iot_automation_data": iot_data
@@ -393,8 +417,11 @@ def iot_automation_agent(state: AgentState) -> AgentState:
 
 def cloud_adoption_agent(state: AgentState) -> AgentState:
     """Specialized agent for cloud adoption and GCC setup"""
-    st.session_state.status_text.info("☁️ Researching cloud adoption and GCC setup...")
-    st.session_state.progress_bar.progress(50)
+    status_placeholder = st.empty()
+    progress_placeholder = st.empty()
+    
+    status_placeholder.info("☁️ Researching cloud adoption and GCC setup...")
+    progress_placeholder.progress(50)
     
     company = state["company_name"]
     
@@ -440,6 +467,9 @@ def cloud_adoption_agent(state: AgentState) -> AgentState:
     except Exception as e:
         cloud_data = {"cloud_adoption_gcc_setup": "Research in progress"}
     
+    status_placeholder.empty()
+    progress_placeholder.empty()
+    
     return {
         "cloud_adoption_complete": True,
         "cloud_adoption_data": cloud_data
@@ -447,8 +477,11 @@ def cloud_adoption_agent(state: AgentState) -> AgentState:
 
 def physical_infrastructure_agent(state: AgentState) -> AgentState:
     """Specialized agent for physical infrastructure signals"""
-    st.session_state.status_text.info("🏗️ Researching physical infrastructure signals...")
-    st.session_state.progress_bar.progress(60)
+    status_placeholder = st.empty()
+    progress_placeholder = st.empty()
+    
+    status_placeholder.info("🏗️ Researching physical infrastructure signals...")
+    progress_placeholder.progress(60)
     
     company = state["company_name"]
     
@@ -506,6 +539,9 @@ def physical_infrastructure_agent(state: AgentState) -> AgentState:
             "expansion_news_12mo": "Research in progress"
         }
     
+    status_placeholder.empty()
+    progress_placeholder.empty()
+    
     return {
         "physical_infrastructure_complete": True,
         "physical_infrastructure_data": infra_data
@@ -513,8 +549,11 @@ def physical_infrastructure_agent(state: AgentState) -> AgentState:
 
 def it_budget_agent(state: AgentState) -> AgentState:
     """Specialized agent for IT infrastructure budget and capex"""
-    st.session_state.status_text.info("💰 Researching IT budget and capex allocation...")
-    st.session_state.progress_bar.progress(70)
+    status_placeholder = st.empty()
+    progress_placeholder = st.empty()
+    
+    status_placeholder.info("💰 Researching IT budget and capex allocation...")
+    progress_placeholder.progress(70)
     
     company = state["company_name"]
     
@@ -560,6 +599,9 @@ def it_budget_agent(state: AgentState) -> AgentState:
     except Exception as e:
         budget_data = {"it_infra_budget_capex": "Research in progress"}
     
+    status_placeholder.empty()
+    progress_placeholder.empty()
+    
     return {
         "it_budget_complete": True,
         "it_budget_data": budget_data
@@ -579,9 +621,10 @@ def check_all_research_complete(state: AgentState) -> AgentState:
     
     all_complete = all(completed_agents)
     
+    # Use direct placeholder instead of session state
+    status_placeholder = st.empty()
     if all_complete:
-        st.session_state.status_text.info("🎯 All research complete! Finalizing report...")
-        st.session_state.progress_bar.progress(90)
+        status_placeholder.info("🎯 All research complete! Finalizing report...")
     else:
         # Show which agents are still working
         pending_agents = []
@@ -593,14 +636,17 @@ def check_all_research_complete(state: AgentState) -> AgentState:
         if not state.get("physical_infrastructure_complete"): pending_agents.append("Physical Infrastructure")
         if not state.get("it_budget_complete"): pending_agents.append("IT Budget")
         
-        st.session_state.status_text.info(f"⏳ Waiting for: {', '.join(pending_agents)}")
+        status_placeholder.info(f"⏳ Waiting for: {', '.join(pending_agents)}")
     
     return {"all_research_complete": all_complete}
 
 def final_assembly_agent(state: AgentState) -> AgentState:
     """Assemble all research data into final structured output"""
-    st.session_state.status_text.info("📊 Assembling final report...")
-    st.session_state.progress_bar.progress(95)
+    status_placeholder = st.empty()
+    progress_placeholder = st.empty()
+    
+    status_placeholder.info("📊 Assembling final report...")
+    progress_placeholder.progress(95)
     
     company = state["company_name"]
     
@@ -681,6 +727,9 @@ def final_assembly_agent(state: AgentState) -> AgentState:
     
     All fields populated with targeted research data.
     """
+    
+    status_placeholder.empty()
+    progress_placeholder.empty()
     
     return {
         "final_json_data": all_data,
@@ -805,12 +854,6 @@ if 'research_history' not in st.session_state:
     st.session_state.research_history = []
 if 'company_input' not in st.session_state:
     st.session_state.company_input = "Snowman Logistics"
-if 'status_text' not in st.session_state:
-    st.session_state.status_text = st.empty()
-if 'progress_bar' not in st.session_state:
-    st.session_state.progress_bar = st.empty()
-if 'agent_status' not in st.session_state:
-    st.session_state.agent_status = {}
 
 # Display agent architecture
 with st.expander("🔧 Parallel Multi-Agent Architecture", expanded=True):
@@ -846,23 +889,19 @@ if submitted:
         st.warning("Please enter a company name.")
         st.stop()
 
-    # Initialize progress
-    st.session_state.progress_bar = st.progress(0)
-    st.session_state.status_text = st.empty()
-    st.session_state.agent_status = {
-        "basic_info": "🟡 Starting...",
-        "network_vendors": "🟡 Starting...", 
-        "wifi_tender": "🟡 Starting...",
-        "iot_automation": "🟡 Starting...",
-        "cloud_adoption": "🟡 Starting...",
-        "physical_infrastructure": "🟡 Starting...",
-        "it_budget": "🟡 Starting..."
-    }
+    # Create progress and status display
+    progress_bar = st.progress(0)
+    status_text = st.empty()
     
-    # Create status display
-    status_container = st.container()
+    # Show initial status
+    status_text.info("🤖 Deploying 7 specialized agents for parallel research...")
+    progress_bar.progress(5)
     
-    with st.spinner(f"🤖 Deploying 7 specialized agents to research **{company_input}** in parallel..."):
+    # Create agent status display
+    st.subheader("🔄 Agent Status")
+    agent_status_display = st.empty()
+    
+    with st.spinner(f"Researching **{company_input}** with 7 parallel agents..."):
         try:
             # Initialize state
             initial_state: AgentState = {
@@ -891,8 +930,8 @@ if submitted:
             data_dict = final_state["final_json_data"]
             
             # Update final progress
-            st.session_state.progress_bar.progress(100)
-            st.session_state.status_text.success(f"🎉 Parallel Research Complete for {company_input}!")
+            progress_bar.progress(100)
+            status_text.success(f"🎉 Parallel Research Complete for {company_input}!")
             
             # Store in history
             research_entry = {
@@ -959,8 +998,8 @@ if submitted:
                  )
                         
         except Exception as e:
-            st.session_state.progress_bar.progress(100)
-            st.error(f"Research failed: {type(e).__name__} - {str(e)}")
+            progress_bar.progress(100)
+            status_text.error(f"Research failed: {type(e).__name__} - {str(e)}")
             st.info("This might be due to API rate limits. Please try again in a few moments.")
 
 # Research History
