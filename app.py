@@ -118,9 +118,9 @@ Syntel specializes in:
 4. KPO/BPO: Industry-specific solutions
 """
 
-# --- Search Utility Function ---
-def perform_targeted_search(queries: list, preferred_domains: list = None) -> str:
-    """Perform targeted search with domain preferences"""
+# --- Enhanced Search Utility Function ---
+def perform_targeted_search(queries: list, preferred_domains: list = None) -> tuple:
+    """Perform targeted search and return both formatted text and raw results"""
     all_results = []
     
     for query in queries:
@@ -146,7 +146,7 @@ def perform_targeted_search(queries: list, preferred_domains: list = None) -> st
             continue
     
     if not all_results:
-        return "No specific information found in targeted search."
+        return "No specific information found in targeted search.", []
     
     research_text = "SEARCH RESULTS:\n\n"
     for i, result in enumerate(all_results):
@@ -156,12 +156,11 @@ def perform_targeted_search(queries: list, preferred_domains: list = None) -> st
         research_text += f"📝 Content: {result['content']}\n"
         research_text += "─" * 60 + "\n"
     
-    return research_text
+    return research_text, all_results
 
-# --- Specialized Research Agents with Detailed Field Extraction ---
+# --- Enhanced Research Agents with Strict Field Mapping ---
 def basic_info_agent(state: AgentState) -> AgentState:
-    """Specialized agent for basic company information"""
-    # Use direct Streamlit components instead of session state
+    """Enhanced agent for basic company information with strict field mapping"""
     status_placeholder = st.empty()
     progress_placeholder = st.empty()
     
@@ -179,29 +178,39 @@ def basic_info_agent(state: AgentState) -> AgentState:
         f'"{company}" revenue financial results'
     ]
     
-    research_text = perform_targeted_search(queries, ["linkedin.com", "zoominfo.com", "crunchbase.com"])
+    research_text, raw_results = perform_targeted_search(queries, ["linkedin.com", "zoominfo.com", "crunchbase.com"])
     
+    # Enhanced extraction with strict field mapping
     extraction_prompt = f"""
     Extract DETAILED BASIC COMPANY INFORMATION for {company} from the research below.
     
     RESEARCH DATA:
     {research_text}
     
-    Extract SPECIFIC information for these fields:
+    You MUST extract and map to these EXACT field names:
     - company_website_url: Official website URL
-    - linkedin_url: LinkedIn company page URL
+    - linkedin_url: LinkedIn company page URL  
     - industry_category: Specific industry classification
     - employee_count_linkedin: Employee count with source
     - headquarters_location: Full headquarters address/location
     - revenue_source: Revenue streams and business model
     
-    Return ONLY a JSON object with these exact field names. Be specific and include numbers, URLs, and sources.
-    If information is not found, use "Information not found in research".
+    Return ONLY a JSON object with these exact field names. For example:
+    {{
+        "company_website_url": "https://www.snowman.in [Source: search results]",
+        "linkedin_url": "https://linkedin.com/company/snowmanlogistics [Source: LinkedIn]",
+        "industry_category": "Cold Chain Logistics [Source: company info]",
+        "employee_count_linkedin": "1,001-5,000 employees [Source: LinkedIn]",
+        "headquarters_location": "Bangalore, Karnataka [Source: company website]",
+        "revenue_source": "Cold chain warehousing and logistics services [Source: financial reports]"
+    }}
+    
+    Be specific and include source URLs when available.
     """
     
     try:
         response = llm_groq.invoke([
-            SystemMessage(content="You are a precise data extraction agent. Return only valid JSON."),
+            SystemMessage(content="You are a precise data extraction agent. Return only valid JSON with exact field names."),
             HumanMessage(content=extraction_prompt)
         ]).content
         
@@ -213,16 +222,22 @@ def basic_info_agent(state: AgentState) -> AgentState:
             basic_data = {}
             
     except Exception as e:
-        basic_data = {
-            "company_website_url": "Research in progress",
-            "linkedin_url": "Research in progress", 
-            "industry_category": "Research in progress",
-            "employee_count_linkedin": "Research in progress",
-            "headquarters_location": "Research in progress",
-            "revenue_source": "Research in progress"
-        }
+        basic_data = {}
     
-    # Clear placeholders
+    # Ensure all basic fields are present with proper fallbacks
+    required_basic_fields = {
+        "company_website_url": "Information not found in research",
+        "linkedin_url": "Information not found in research", 
+        "industry_category": "Information not found in research",
+        "employee_count_linkedin": "Information not found in research",
+        "headquarters_location": "Information not found in research",
+        "revenue_source": "Information not found in research"
+    }
+    
+    for field, default in required_basic_fields.items():
+        if field not in basic_data or not basic_data[field]:
+            basic_data[field] = default
+    
     status_placeholder.empty()
     progress_placeholder.empty()
     
@@ -232,7 +247,7 @@ def basic_info_agent(state: AgentState) -> AgentState:
     }
 
 def network_vendors_agent(state: AgentState) -> AgentState:
-    """Specialized agent for existing network vendors and tech stack"""
+    """Enhanced agent for existing network vendors and tech stack"""
     status_placeholder = st.empty()
     progress_placeholder = st.empty()
     
@@ -249,7 +264,7 @@ def network_vendors_agent(state: AgentState) -> AgentState:
         f'"{company}" IT partnerships vendors'
     ]
     
-    research_text = perform_targeted_search(queries, NETWORK_VENDOR_DOMAINS)
+    research_text, raw_results = perform_targeted_search(queries, NETWORK_VENDOR_DOMAINS)
     
     extraction_prompt = f"""
     Extract EXISTING NETWORK VENDORS and TECH STACK for {company} from the research below.
@@ -257,18 +272,15 @@ def network_vendors_agent(state: AgentState) -> AgentState:
     RESEARCH DATA:
     {research_text}
     
-    Extract SPECIFIC information about:
-    - existing_network_vendors: Specific technology vendors, software platforms, cloud services
-    - Include vendor names, technologies, and specific systems used
-    
-    Look for mentions of: Cisco, VMware, SAP, Oracle, Microsoft, AWS, Azure, Infosys, TCS, etc.
+    Extract SPECIFIC information about existing_network_vendors field.
     
     Return ONLY a JSON object with this structure:
     {{
-        "existing_network_vendors": "Detailed description of vendors and technologies with sources"
+        "existing_network_vendors": "Detailed description of specific vendors, technologies, and platforms used by {company}. Include vendor names like Cisco, VMware, SAP, Oracle, Microsoft, AWS, Azure, Infosys, etc. with source URLs when available."
     }}
     
-    Be specific and include vendor names, technologies, and source URLs when available.
+    Be specific and include actual vendor names, technologies, and source URLs.
+    If no specific vendors found, state "No specific vendor information found in research".
     """
     
     try:
@@ -284,7 +296,7 @@ def network_vendors_agent(state: AgentState) -> AgentState:
             vendor_data = {"existing_network_vendors": "No specific vendor information found in research"}
             
     except Exception as e:
-        vendor_data = {"existing_network_vendors": "Research in progress"}
+        vendor_data = {"existing_network_vendors": "Research encountered an error"}
     
     status_placeholder.empty()
     progress_placeholder.empty()
@@ -295,7 +307,7 @@ def network_vendors_agent(state: AgentState) -> AgentState:
     }
 
 def wifi_tender_agent(state: AgentState) -> AgentState:
-    """Specialized agent for WiFi/LAN tenders and upgrades"""
+    """Enhanced agent for WiFi/LAN tenders and upgrades"""
     status_placeholder = st.empty()
     progress_placeholder = st.empty()
     
@@ -312,7 +324,7 @@ def wifi_tender_agent(state: AgentState) -> AgentState:
         f'"{company}" wireless network deployment'
     ]
     
-    research_text = perform_targeted_search(queries, WIFI_TENDER_DOMAINS)
+    research_text, raw_results = perform_targeted_search(queries, WIFI_TENDER_DOMAINS)
     
     extraction_prompt = f"""
     Find RECENT Wi-Fi UPGRADES or LAN TENDERS for {company} from the research below.
@@ -320,16 +332,14 @@ def wifi_tender_agent(state: AgentState) -> AgentState:
     RESEARCH DATA:
     {research_text}
     
-    Extract SPECIFIC information about:
-    - wifi_lan_tender_found: Any recent WiFi upgrades, LAN tenders, network infrastructure projects
+    Extract SPECIFIC information for wifi_lan_tender_found field.
     
     Return ONLY a JSON object with this structure:
     {{
-        "wifi_lan_tender_found": "Specific details about tenders or upgrades with dates and sources"
+        "wifi_lan_tender_found": "Specific details about any WiFi upgrades, LAN tenders, or network infrastructure projects with dates, locations, and source URLs. If no tenders found, state 'No recent WiFi/LAN tenders identified in research'."
     }}
     
-    If no tenders are found, state "No recent WiFi/LAN tenders identified in research".
-    Include specific details, dates, and source URLs when available.
+    Include specific details, dates, locations, and source URLs when available.
     """
     
     try:
@@ -345,7 +355,7 @@ def wifi_tender_agent(state: AgentState) -> AgentState:
             wifi_data = {"wifi_lan_tender_found": "No recent WiFi/LAN tenders identified in research"}
             
     except Exception as e:
-        wifi_data = {"wifi_lan_tender_found": "Research in progress"}
+        wifi_data = {"wifi_lan_tender_found": "Research encountered an error"}
     
     status_placeholder.empty()
     progress_placeholder.empty()
@@ -356,7 +366,7 @@ def wifi_tender_agent(state: AgentState) -> AgentState:
     }
 
 def iot_automation_agent(state: AgentState) -> AgentState:
-    """Specialized agent for IoT/Automation/Edge integration"""
+    """Enhanced agent for IoT/Automation/Edge integration"""
     status_placeholder = st.empty()
     progress_placeholder = st.empty()
     
@@ -373,7 +383,7 @@ def iot_automation_agent(state: AgentState) -> AgentState:
         f'"{company}" robotics process automation'
     ]
     
-    research_text = perform_targeted_search(queries, IOT_AUTOMATION_DOMAINS)
+    research_text, raw_results = perform_targeted_search(queries, IOT_AUTOMATION_DOMAINS)
     
     extraction_prompt = f"""
     Find IoT/AUTOMATION/EDGE INTEGRATION initiatives for {company} from the research below.
@@ -381,15 +391,15 @@ def iot_automation_agent(state: AgentState) -> AgentState:
     RESEARCH DATA:
     {research_text}
     
-    Extract SPECIFIC information about:
-    - iot_automation_edge_integration: IoT projects, automation initiatives, edge computing deployments
+    Extract SPECIFIC information for iot_automation_edge_integration field.
     
     Return ONLY a JSON object with this structure:
     {{
-        "iot_automation_edge_integration": "Detailed description of IoT/automation projects with technologies and sources"
+        "iot_automation_edge_integration": "Detailed description of specific IoT projects, automation initiatives, edge computing deployments, robotics, or smart technologies used by {company}. Include technologies, project scope, and source URLs when available."
     }}
     
     Be specific about technologies used, project scope, and include source URLs.
+    If no specific initiatives found, state "No specific IoT/automation initiatives found in research".
     """
     
     try:
@@ -405,7 +415,7 @@ def iot_automation_agent(state: AgentState) -> AgentState:
             iot_data = {"iot_automation_edge_integration": "No specific IoT/automation initiatives found in research"}
             
     except Exception as e:
-        iot_data = {"iot_automation_edge_integration": "Research in progress"}
+        iot_data = {"iot_automation_edge_integration": "Research encountered an error"}
     
     status_placeholder.empty()
     progress_placeholder.empty()
@@ -416,7 +426,7 @@ def iot_automation_agent(state: AgentState) -> AgentState:
     }
 
 def cloud_adoption_agent(state: AgentState) -> AgentState:
-    """Specialized agent for cloud adoption and GCC setup"""
+    """Enhanced agent for cloud adoption and GCC setup"""
     status_placeholder = st.empty()
     progress_placeholder = st.empty()
     
@@ -433,7 +443,7 @@ def cloud_adoption_agent(state: AgentState) -> AgentState:
         f'"{company}" cloud infrastructure investment'
     ]
     
-    research_text = perform_targeted_search(queries, CLOUD_ADOPTION_DOMAINS)
+    research_text, raw_results = perform_targeted_search(queries, CLOUD_ADOPTION_DOMAINS)
     
     extraction_prompt = f"""
     Find CLOUD ADOPTION and GCC SETUP information for {company} from the research below.
@@ -441,15 +451,15 @@ def cloud_adoption_agent(state: AgentState) -> AgentState:
     RESEARCH DATA:
     {research_text}
     
-    Extract SPECIFIC information about:
-    - cloud_adoption_gcc_setup: Cloud migration projects, GCC establishment, cloud strategy
+    Extract SPECIFIC information for cloud_adoption_gcc_setup field.
     
     Return ONLY a JSON object with this structure:
     {{
-        "cloud_adoption_gcc_setup": "Detailed description of cloud adoption and GCC initiatives with platforms and sources"
+        "cloud_adoption_gcc_setup": "Detailed description of cloud migration projects, GCC establishment, cloud strategy, specific cloud platforms used (AWS, Azure, Google Cloud), and source URLs when available."
     }}
     
-    Be specific about cloud platforms, migration status, and include source URLs.
+    Be specific about cloud platforms, migration status, GCC setup, and include source URLs.
+    If no specific cloud adoption found, state "No specific cloud adoption initiatives found in research".
     """
     
     try:
@@ -465,7 +475,7 @@ def cloud_adoption_agent(state: AgentState) -> AgentState:
             cloud_data = {"cloud_adoption_gcc_setup": "No specific cloud adoption initiatives found in research"}
             
     except Exception as e:
-        cloud_data = {"cloud_adoption_gcc_setup": "Research in progress"}
+        cloud_data = {"cloud_adoption_gcc_setup": "Research encountered an error"}
     
     status_placeholder.empty()
     progress_placeholder.empty()
@@ -476,7 +486,7 @@ def cloud_adoption_agent(state: AgentState) -> AgentState:
     }
 
 def physical_infrastructure_agent(state: AgentState) -> AgentState:
-    """Specialized agent for physical infrastructure signals"""
+    """Enhanced agent for physical infrastructure signals"""
     status_placeholder = st.empty()
     progress_placeholder = st.empty()
     
@@ -493,7 +503,7 @@ def physical_infrastructure_agent(state: AgentState) -> AgentState:
         f'"{company}" capacity expansion announcement'
     ]
     
-    research_text = perform_targeted_search(queries, PHYSICAL_INFRASTRUCTURE_DOMAINS)
+    research_text, raw_results = perform_targeted_search(queries, PHYSICAL_INFRASTRUCTURE_DOMAINS)
     
     extraction_prompt = f"""
     Find PHYSICAL INFRASTRUCTURE SIGNALS for {company} from the research below.
@@ -501,24 +511,24 @@ def physical_infrastructure_agent(state: AgentState) -> AgentState:
     RESEARCH DATA:
     {research_text}
     
-    Extract SPECIFIC information about:
+    Extract SPECIFIC information for these THREE fields:
     - physical_infrastructure_signals: New facilities, expansions, construction projects
-    - branch_network_count: Number of facilities, locations, capacity
-    - expansion_news_12mo: Recent expansion announcements
+    - branch_network_count: Number of facilities, locations, capacity with specific numbers
+    - expansion_news_12mo: Recent expansion announcements with dates and details
     
-    Return ONLY a JSON object with this structure:
+    Return ONLY a JSON object with this EXACT structure:
     {{
-        "physical_infrastructure_signals": "Detailed infrastructure projects with locations and timelines",
-        "branch_network_count": "Specific facility count and capacity details",
-        "expansion_news_12mo": "Recent expansion announcements with dates"
+        "physical_infrastructure_signals": "Detailed infrastructure projects with locations, capacities, and timelines",
+        "branch_network_count": "Specific facility count, locations, and capacity details", 
+        "expansion_news_12mo": "Recent expansion announcements with dates, locations, and investment details"
     }}
     
-    Be specific about locations, capacities, investment amounts, and include source URLs.
+    Be specific about locations, capacities, investment amounts, dates, and include source URLs.
     """
     
     try:
         response = llm_groq.invoke([
-            SystemMessage(content="You extract physical infrastructure and expansion details. Return only valid JSON."),
+            SystemMessage(content="You extract physical infrastructure and expansion details. Return only valid JSON with exact field names."),
             HumanMessage(content=extraction_prompt)
         ]).content
         
@@ -526,18 +536,21 @@ def physical_infrastructure_agent(state: AgentState) -> AgentState:
         if json_match:
             infra_data = json.loads(json_match.group(0))
         else:
-            infra_data = {
-                "physical_infrastructure_signals": "No specific infrastructure projects found in research",
-                "branch_network_count": "Facility information not available in research",
-                "expansion_news_12mo": "No recent expansion announcements found in research"
-            }
+            infra_data = {}
             
     except Exception as e:
-        infra_data = {
-            "physical_infrastructure_signals": "Research in progress",
-            "branch_network_count": "Research in progress", 
-            "expansion_news_12mo": "Research in progress"
-        }
+        infra_data = {}
+    
+    # Ensure all infrastructure fields are present
+    required_infra_fields = {
+        "physical_infrastructure_signals": "No specific infrastructure projects found in research",
+        "branch_network_count": "Facility information not available in research",
+        "expansion_news_12mo": "No recent expansion announcements found in research"
+    }
+    
+    for field, default in required_infra_fields.items():
+        if field not in infra_data or not infra_data[field]:
+            infra_data[field] = default
     
     status_placeholder.empty()
     progress_placeholder.empty()
@@ -548,7 +561,7 @@ def physical_infrastructure_agent(state: AgentState) -> AgentState:
     }
 
 def it_budget_agent(state: AgentState) -> AgentState:
-    """Specialized agent for IT infrastructure budget and capex"""
+    """Enhanced agent for IT infrastructure budget and capex"""
     status_placeholder = st.empty()
     progress_placeholder = st.empty()
     
@@ -565,7 +578,7 @@ def it_budget_agent(state: AgentState) -> AgentState:
         f'"{company}" annual report technology investment'
     ]
     
-    research_text = perform_targeted_search(queries, IT_BUDGET_DOMAINS)
+    research_text, raw_results = perform_targeted_search(queries, IT_BUDGET_DOMAINS)
     
     extraction_prompt = f"""
     Find IT INFRASTRUCTURE BUDGET and CAPEX ALLOCATION for {company} from the research below.
@@ -573,15 +586,15 @@ def it_budget_agent(state: AgentState) -> AgentState:
     RESEARCH DATA:
     {research_text}
     
-    Extract SPECIFIC information about:
-    - it_infra_budget_capex: IT budget amounts, capital expenditure, technology investments
+    Extract SPECIFIC information for it_infra_budget_capex field.
     
     Return ONLY a JSON object with this structure:
     {{
-        "it_infra_budget_capex": "Specific budget amounts, capex allocations, and investment timelines with sources"
+        "it_infra_budget_capex": "Specific budget amounts, capex allocations, investment timelines, and source URLs from financial reports or announcements."
     }}
     
-    Be specific about amounts, timeframes, and include source URLs from financial reports.
+    Be specific about amounts, timeframes, and include source URLs.
+    If no specific budget information found, state "No specific IT budget information found in research".
     """
     
     try:
@@ -597,7 +610,7 @@ def it_budget_agent(state: AgentState) -> AgentState:
             budget_data = {"it_infra_budget_capex": "No specific IT budget information found in research"}
             
     except Exception as e:
-        budget_data = {"it_infra_budget_capex": "Research in progress"}
+        budget_data = {"it_infra_budget_capex": "Research encountered an error"}
     
     status_placeholder.empty()
     progress_placeholder.empty()
@@ -621,111 +634,150 @@ def check_all_research_complete(state: AgentState) -> AgentState:
     
     all_complete = all(completed_agents)
     
-    # Use direct placeholder instead of session state
-    status_placeholder = st.empty()
-    if all_complete:
-        status_placeholder.info("🎯 All research complete! Finalizing report...")
-    else:
-        # Show which agents are still working
-        pending_agents = []
-        if not state.get("basic_info_complete"): pending_agents.append("Basic Info")
-        if not state.get("network_vendors_complete"): pending_agents.append("Network Vendors")
-        if not state.get("wifi_tender_complete"): pending_agents.append("WiFi Tender")
-        if not state.get("iot_automation_complete"): pending_agents.append("IoT/Automation")
-        if not state.get("cloud_adoption_complete"): pending_agents.append("Cloud Adoption")
-        if not state.get("physical_infrastructure_complete"): pending_agents.append("Physical Infrastructure")
-        if not state.get("it_budget_complete"): pending_agents.append("IT Budget")
-        
-        status_placeholder.info(f"⏳ Waiting for: {', '.join(pending_agents)}")
-    
     return {"all_research_complete": all_complete}
 
 def final_assembly_agent(state: AgentState) -> AgentState:
-    """Assemble all research data into final structured output"""
+    """Enhanced assembly agent that ensures all fields are properly mapped"""
     status_placeholder = st.empty()
     progress_placeholder = st.empty()
     
-    status_placeholder.info("📊 Assembling final report...")
+    status_placeholder.info("📊 Assembling final report with field validation...")
     progress_placeholder.progress(95)
     
     company = state["company_name"]
     
-    # Combine all research data
+    # Combine all research data with proper field validation
     all_data = {}
     
-    # Merge data from all agents
-    agents_data = [
-        state.get("basic_info_data", {}),
-        state.get("network_vendors_data", {}),
-        state.get("wifi_tender_data", {}),
-        state.get("iot_automation_data", {}),
-        state.get("cloud_adoption_data", {}),
-        state.get("physical_infrastructure_data", {}),
-        state.get("it_budget_data", {})
-    ]
+    # Define which agent handles which fields
+    field_agent_mapping = {
+        "basic_info_data": [
+            "linkedin_url", "company_website_url", "industry_category",
+            "employee_count_linkedin", "headquarters_location", "revenue_source"
+        ],
+        "network_vendors_data": ["existing_network_vendors"],
+        "wifi_tender_data": ["wifi_lan_tender_found"],
+        "iot_automation_data": ["iot_automation_edge_integration"],
+        "cloud_adoption_data": ["cloud_adoption_gcc_setup"],
+        "physical_infrastructure_data": [
+            "physical_infrastructure_signals", "branch_network_count", "expansion_news_12mo"
+        ],
+        "it_budget_data": ["it_infra_budget_capex"]
+    }
     
-    for agent_data in agents_data:
-        all_data.update(agent_data)
+    # Collect data from each agent with field validation
+    for agent_key, fields in field_agent_mapping.items():
+        agent_data = state.get(agent_key, {})
+        for field in fields:
+            if field in agent_data and agent_data[field] and agent_data[field] not in [
+                "Research in progress", "Research encountered an error", 
+                "Information not found in research"
+            ]:
+                all_data[field] = agent_data[field]
     
-    # Ensure all required fields are present
+    # Ensure all required fields are present with proper fallbacks
     for field in REQUIRED_FIELDS:
         if field not in all_data:
-            all_data[field] = "Information not available from research"
+            all_data[field] = "Information not available from comprehensive research"
     
-    # Generate relevance analysis
+    # Set default values for fields that should always have something
+    all_data.setdefault("digital_transformation_initiatives", "Digital transformation initiatives under investigation")
+    all_data.setdefault("it_leadership_change", "IT leadership information being researched")
+    
+    # Generate enhanced relevance analysis
+    research_context = f"""
+    Company: {company}
+    
+    Research Findings:
+    - Basic Info: {all_data.get('industry_category', 'Not found')}
+    - Network Vendors: {all_data.get('existing_network_vendors', 'Not found')}
+    - Infrastructure: {all_data.get('branch_network_count', 'Not found')}
+    - Expansion: {all_data.get('expansion_news_12mo', 'Not found')}
+    - IoT/Automation: {all_data.get('iot_automation_edge_integration', 'Not found')}
+    - Cloud: {all_data.get('cloud_adoption_gcc_setup', 'Not found')}
+    - Budget: {all_data.get('it_infra_budget_capex', 'Not found')}
+    """
+    
     relevance_prompt = f"""
-    Based on the following comprehensive research data for {company}, generate specific relevance analysis for Syntel:
+    Based on the following research data for {company}, generate SPECIFIC relevance analysis for Syntel:
     
-    RESEARCH DATA:
-    {json.dumps(all_data, indent=2)}
+    {research_context}
     
-    Syntel Expertise:
+    Syntel Core Expertise:
     {SYNTEL_EXPERTISE}
     
-    Generate:
-    1. why_relevant_to_syntel_bullets: 3-5 specific, actionable bullet points based on the research
-    2. intent_scoring_level: Low, Medium, or High based on concrete evidence
+    Generate TWO specific outputs:
     
-    Focus on specific opportunities found in the research.
+    1. why_relevant_to_syntel_bullets: 3-5 SPECIFIC, ACTIONABLE bullet points based on ACTUAL research findings
+    2. intent_scoring_level: Low, Medium, or High based on CONCRETE evidence from research
+    
+    Scoring Criteria:
+    - High: Clear IT transformation signals, specific infrastructure expansion, budget indications
+    - Medium: Some digital initiatives, growth potential, moderate IT signals  
+    - Low: Limited IT signals, stable operations, minimal transformation
+    
+    Make bullets SPECIFIC and based on actual research findings, not generic statements.
     """
     
     try:
         relevance_response = llm_groq.invoke([
-            SystemMessage(content="You analyze business relevance for IT services companies."),
+            SystemMessage(content="You analyze business relevance for IT services companies. Be specific and evidence-based."),
             HumanMessage(content=relevance_prompt)
         ]).content
         
-        # Extract relevance information
-        if "why_relevant_to_syntel_bullets" not in all_data:
-            all_data["why_relevant_to_syntel_bullets"] = relevance_response
+        # Extract relevance information with better parsing
+        lines = relevance_response.split('\n')
+        bullets = []
+        scoring = "Medium"  # Default
         
-        if "intent_scoring_level" not in all_data:
-            # Simple extraction of scoring level
-            if "High" in relevance_response:
-                all_data["intent_scoring_level"] = "High"
-            elif "Low" in relevance_response:
-                all_data["intent_scoring_level"] = "Low"
-            else:
-                all_data["intent_scoring_level"] = "Medium"
-                
+        for line in lines:
+            line = line.strip()
+            if line.startswith('*') or line.startswith('-') or line.startswith('•'):
+                bullets.append(line)
+            elif 'intent_scoring_level' in line.lower() or 'scoring' in line.lower():
+                if 'high' in line.lower():
+                    scoring = "High"
+                elif 'low' in line.lower():
+                    scoring = "Low"
+        
+        if bullets:
+            all_data["why_relevant_to_syntel_bullets"] = "\n".join(bullets[:5])  # Limit to 5 bullets
+        else:
+            all_data["why_relevant_to_syntel_bullets"] = relevance_response[:500]  # Fallback
+        
+        all_data["intent_scoring_level"] = scoring
+        
     except Exception as e:
-        all_data["why_relevant_to_syntel_bullets"] = "Relevance analysis based on comprehensive research"
+        all_data["why_relevant_to_syntel_bullets"] = "Relevance analysis based on comprehensive multi-agent research"
         all_data["intent_scoring_level"] = "Medium"
     
-    # Create research summary
+    # Create detailed research summary
+    completed_agents = sum([
+        state.get("basic_info_complete", False),
+        state.get("network_vendors_complete", False),
+        state.get("wifi_tender_complete", False),
+        state.get("iot_automation_complete", False),
+        state.get("cloud_adoption_complete", False),
+        state.get("physical_infrastructure_complete", False),
+        state.get("it_budget_complete", False)
+    ])
+    
     research_summary = f"""
     COMPREHENSIVE RESEARCH COMPLETE FOR {company.upper()}
     
-    Research conducted across 7 specialized agents:
-    ✅ Basic Company Information
-    ✅ Network Vendors & Tech Stack  
-    ✅ WiFi/LAN Tender Analysis
-    ✅ IoT/Automation Initiatives
-    ✅ Cloud Adoption & GCC Setup
-    ✅ Physical Infrastructure Signals
-    ✅ IT Budget & Capex Analysis
+    ✅ {completed_agents}/7 Specialized Agents Completed Research
+    📊 {sum(1 for f in REQUIRED_FIELDS if all_data.get(f) and 'not available' not in all_data.get(f, '').lower())}/{len(REQUIRED_FIELDS)} Fields Populated
     
-    All fields populated with targeted research data.
+    Agent Completion Status:
+    {'✅' if state.get('basic_info_complete') else '❌'} Basic Company Information
+    {'✅' if state.get('network_vendors_complete') else '❌'} Network Vendors & Tech Stack  
+    {'✅' if state.get('wifi_tender_complete') else '❌'} WiFi/LAN Tender Analysis
+    {'✅' if state.get('iot_automation_complete') else '❌'} IoT/Automation Initiatives
+    {'✅' if state.get('cloud_adoption_complete') else '❌'} Cloud Adoption & GCC Setup
+    {'✅' if state.get('physical_infrastructure_complete') else '❌'} Physical Infrastructure Signals
+    {'✅' if state.get('it_budget_complete') else '❌'} IT Budget & Capex Analysis
+    
+    Final Intent Score: {all_data.get('intent_scoring_level', 'Medium')}
     """
     
     status_placeholder.empty()
@@ -776,7 +828,7 @@ def build_parallel_research_graph():
         if state.get("all_research_complete", False):
             return "final_assembly"
         else:
-            return "check_completion"  # Continue checking
+            return "check_completion"
 
     workflow.add_conditional_edges(
         "check_completion",
@@ -825,12 +877,12 @@ def format_data_for_display(company_input: str, data_dict: dict) -> pd.DataFrame
         if display_col == "Company Name":
             value = company_input
         else:
-            value = data_dict.get(data_field, "Research complete - information not found")
+            value = data_dict.get(data_field, "Research complete - detailed information not found")
         
         # Format bullet points for better display
         if data_field == "why_relevant_to_syntel_bullets":
             if isinstance(value, str):
-                html_value = value.replace('\n', '<br>').replace('*', '•')
+                html_value = value.replace('\n', '<br>').replace('*', '•').replace('-', '•')
                 data_list.append({"Column Header": display_col, "Value": f'<div style="text-align: left;">{html_value}</div>'})
             else:
                 data_list.append({"Column Header": display_col, "Value": str(value)})
@@ -841,13 +893,13 @@ def format_data_for_display(company_input: str, data_dict: dict) -> pd.DataFrame
 
 # --- Streamlit UI ---
 st.set_page_config(
-    page_title="Syntel BI Agent (Parallel Multi-Agent)",
+    page_title="Syntel BI Agent (Enhanced Multi-Agent)",
     layout="wide",
     page_icon="🏢"
 )
 
 st.title("🏢 Syntel Company Data AI Agent")
-st.markdown("### 🤖 Parallel Multi-Agent Research System")
+st.markdown("### 🤖 Enhanced Multi-Agent Research System")
 
 # Initialize session state
 if 'research_history' not in st.session_state:
@@ -855,23 +907,24 @@ if 'research_history' not in st.session_state:
 if 'company_input' not in st.session_state:
     st.session_state.company_input = "Snowman Logistics"
 
-# Display agent architecture
-with st.expander("🔧 Parallel Multi-Agent Architecture", expanded=True):
+# Display enhanced agent architecture
+with st.expander("🔧 Enhanced Multi-Agent Architecture", expanded=True):
     st.markdown("""
-    **7 Specialized Agents Running in Parallel:**
-    - 🟢 **Basic Info Agent**: Company website, LinkedIn, headquarters, industry
-    - 🟢 **Network Vendors Agent**: Tech stack, IT vendors, cloud providers  
-    - 🟢 **WiFi/LAN Agent**: Network upgrades, tender information
-    - 🟢 **IoT/Automation Agent**: IoT projects, automation initiatives
-    - 🟢 **Cloud Adoption Agent**: Cloud migration, GCC setup
-    - 🟢 **Physical Infrastructure Agent**: Facility expansions, construction
-    - 🟢 **IT Budget Agent**: Capex allocation, budget analysis
+    **🚀 7 Enhanced Specialized Agents:**
+    - **🔍 Basic Info Agent**: Company website, LinkedIn, headquarters, industry, revenue
+    - **🖧 Network Vendors Agent**: Tech stack, IT vendors, cloud providers with source links  
+    - **📡 WiFi/LAN Agent**: Network upgrades, tender information with specific details
+    - **🤖 IoT/Automation Agent**: IoT projects, automation initiatives with technologies
+    - **☁️ Cloud Adoption Agent**: Cloud migration, GCC setup with platform details
+    - **🏗️ Physical Infrastructure Agent**: Facility expansions, construction with locations
+    - **💰 IT Budget Agent**: Capex allocation, budget analysis with amounts
     
-    **System Features:**
-    - ✅ All agents wait for completion before final output
-    - ✅ No partial or incomplete data displays
-    - ✅ Real-time agent status tracking
-    - ✅ Comprehensive field coverage
+    **🛡️ Enhanced Features:**
+    - ✅ Strict field mapping and validation
+    - ✅ Source URL inclusion in all fields
+    - ✅ No "Research in progress" in final output
+    - ✅ Comprehensive error handling
+    - ✅ Field completion tracking
     """)
 
 # Input section
@@ -880,7 +933,7 @@ with col1:
     company_input = st.text_input("Enter the company name to research:", st.session_state.company_input)
 with col2:
     with st.form("research_form"):
-        submitted = st.form_submit_button("🚀 Start Parallel Research", type="primary")
+        submitted = st.form_submit_button("🚀 Start Enhanced Research", type="primary")
 
 if submitted:
     st.session_state.company_input = company_input
@@ -894,14 +947,10 @@ if submitted:
     status_text = st.empty()
     
     # Show initial status
-    status_text.info("🤖 Deploying 7 specialized agents for parallel research...")
+    status_text.info("🤖 Deploying 7 enhanced specialized agents for comprehensive research...")
     progress_bar.progress(5)
     
-    # Create agent status display
-    st.subheader("🔄 Agent Status")
-    agent_status_display = st.empty()
-    
-    with st.spinner(f"Researching **{company_input}** with 7 parallel agents..."):
+    with st.spinner(f"Researching **{company_input}** with enhanced multi-agent system..."):
         try:
             # Initialize state
             initial_state: AgentState = {
@@ -931,7 +980,7 @@ if submitted:
             
             # Update final progress
             progress_bar.progress(100)
-            status_text.success(f"🎉 Parallel Research Complete for {company_input}!")
+            status_text.success(f"🎉 Enhanced Research Complete for {company_input}!")
             
             # Store in history
             research_entry = {
@@ -943,22 +992,29 @@ if submitted:
             
             # Display completion message
             st.balloons()
-            st.success("✅ All 7 specialized agents have completed their research!")
+            st.success("✅ All 7 enhanced agents have completed their research!")
             
             # Display final results
             st.subheader(f"📊 Comprehensive Business Intelligence Report for {company_input}")
             final_df = format_data_for_display(company_input, data_dict)
             st.markdown(final_df.to_html(escape=False, header=True, index=False), unsafe_allow_html=True)
             
-            # Show research summary
-            with st.expander("🔍 Research Summary", expanded=True):
+            # Show enhanced research summary
+            with st.expander("🔍 Detailed Research Summary", expanded=True):
                 st.markdown(final_state.get("research_summary", "Research completed successfully."))
                 
-                # Show field completion status
-                st.subheader("Field Completion Status")
-                completed_fields = sum(1 for field in REQUIRED_FIELDS if data_dict.get(field) and "Research in progress" not in str(data_dict.get(field)))
+                # Show detailed field completion status
+                st.subheader("📈 Field Completion Analytics")
+                completed_fields = sum(1 for field in REQUIRED_FIELDS if data_dict.get(field) and 'not available' not in data_dict.get(field, '').lower())
                 total_fields = len(REQUIRED_FIELDS)
-                st.metric("Fields Completed", f"{completed_fields}/{total_fields}")
+                
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Fields Completed", f"{completed_fields}/{total_fields}")
+                with col2:
+                    st.metric("Completion Rate", f"{(completed_fields/total_fields)*100:.1f}%")
+                with col3:
+                    st.metric("Intent Score", data_dict.get("intent_scoring_level", "Medium"))
             
             # Download options
             st.subheader("💾 Download Complete Report")
@@ -975,7 +1031,7 @@ if submitted:
                  st.download_button(
                      label="Download JSON",
                      data=json.dumps(data_dict, indent=2),
-                     file_name=f"{company_input.replace(' ', '_')}_complete_data.json",
+                     file_name=f"{company_input.replace(' ', '_')}_enhanced_data.json",
                      mime="application/json"
                  )
 
@@ -984,7 +1040,7 @@ if submitted:
                  st.download_button(
                      label="Download CSV",
                      data=csv_data,
-                     file_name=f"{company_input.replace(' ', '_')}_complete_data.csv",
+                     file_name=f"{company_input.replace(' ', '_')}_enhanced_data.csv",
                      mime="text/csv"
                  )
                  
@@ -993,14 +1049,14 @@ if submitted:
                  st.download_button(
                      label="Download Excel",
                      data=excel_data,
-                     file_name=f"{company_input.replace(' ', '_')}_complete_data.xlsx",
+                     file_name=f"{company_input.replace(' ', '_')}_enhanced_data.xlsx",
                      mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                  )
                         
         except Exception as e:
             progress_bar.progress(100)
             status_text.error(f"Research failed: {type(e).__name__} - {str(e)}")
-            st.info("This might be due to API rate limits. Please try again in a few moments.")
+            st.info("This might be due to API rate limits or network issues. Please try again in a few moments.")
 
 # Research History
 if st.session_state.research_history:
@@ -1010,7 +1066,7 @@ if st.session_state.research_history:
         
         with st.sidebar.expander(f"**{research['company']}** - {research['timestamp'][:10]}", expanded=False):
             st.write(f"🎯 Intent Score: {research['data'].get('intent_scoring_level', 'N/A')}")
-            completed_fields = sum(1 for field in REQUIRED_FIELDS if research['data'].get(field) and "Research in progress" not in str(research['data'].get(field)))
+            completed_fields = sum(1 for field in REQUIRED_FIELDS if research['data'].get(field) and 'not available' not in research['data'].get(field, '').lower())
             st.write(f"📊 Fields Completed: {completed_fields}/{len(REQUIRED_FIELDS)}")
             if st.button(f"📥 Load {research['company']}", key=f"load_{original_index}"):
                 st.session_state.company_input = research['company'] 
@@ -1020,8 +1076,8 @@ if st.session_state.research_history:
 st.markdown("---")
 st.markdown(
     "<div style='text-align: center; color: gray;'>"
-    "🤖 Powered by Parallel Multi-Agent AI Research System | "
-    "Complete Field Coverage | No Partial Outputs"
+    "🤖 Powered by Enhanced Multi-Agent AI Research System | "
+    "Strict Field Mapping | Source URL Integration | No Partial Outputs"
     "</div>",
     unsafe_allow_html=True
 )
