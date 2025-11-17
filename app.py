@@ -185,10 +185,10 @@ def clean_and_format_url(url: str) -> str:
     return url
 
 # --- Enhanced Extraction Prompts ---
-# MODIFICATION: Prompts are updated to explicitly ask for short, factual data only.
 def get_detailed_extraction_prompt(company_name: str, field_name: str, research_context: str) -> str:
     """Get detailed extraction prompts for each field"""
     
+    # Prompts are optimized to ask for FACTUAL DATA ONLY and nothing else.
     prompts = {
         "revenue_source": f"""
         Extract ONLY the annual revenue (in USD, if possible) and key financial facts for {company_name}.
@@ -206,7 +206,6 @@ def get_detailed_extraction_prompt(company_name: str, field_name: str, research_
         
         "headquarters_location": f"""
         Extract ONLY the full, complete headquarters address for {company_name}.
-        Do not include component breakdowns (like 'City:', 'State:', etc.).
         
         RESEARCH DATA:
         {research_context}
@@ -219,7 +218,7 @@ def get_detailed_extraction_prompt(company_name: str, field_name: str, research_
         """,
         
         "branch_network_count": f"""
-        Extract ONLY the total number of facilities/branches/locations and key recent expansions for {company_name}.
+        Extract ONLY the total number of facilities/branches/locations and key capacity facts for {company_name}.
         
         RESEARCH DATA:
         {research_context}
@@ -311,7 +310,7 @@ def get_detailed_extraction_prompt(company_name: str, field_name: str, research_
     }
     
     return prompts.get(field_name, f"""
-    Extract ONLY the comprehensive information about {field_name} for {company_name}.
+    Extract ONLY the comprehensive, short, and correct information about {field_name} for {company_name}.
     
     RESEARCH DATA:
     {research_context}
@@ -330,7 +329,7 @@ def dynamic_extract_field_with_sources(company_name: str, field_name: str, searc
     if not search_results:
         return "N/A"
     
-    # SPECIAL HANDLING: For LinkedIn URL and Website URL
+    # SPECIAL HANDLING: For URLs
     if field_name == "linkedin_url":
         for result in search_results:
             url = result.get('url', '')
@@ -348,9 +347,8 @@ def dynamic_extract_field_with_sources(company_name: str, field_name: str, searc
     
     # Format detailed research context
     research_context = f"Research data for {company_name} - {field_name}:\n\n"
-    for i, result in enumerate(search_results[:4]):  # Use more results
+    for i, result in enumerate(search_results[:4]):
         research_context += f"SOURCE {i+1} - {result.get('title', 'No Title')}:\n"
-        # Only include the content snippet
         research_context += f"CONTENT: {result['content']}\n\n" 
     
     # Get unique source URLs
@@ -360,12 +358,12 @@ def dynamic_extract_field_with_sources(company_name: str, field_name: str, searc
     prompt = get_detailed_extraction_prompt(company_name, field_name, research_context)
     
     try:
-        # --- CRITICAL MODIFICATION: Updated System Message for Brevity ---
+        # --- CRITICAL MODIFICATION: Finalized System Message for MAX Conciseness ---
         response = llm_groq.invoke([
-            SystemMessage(content="""You are an expert research analyst. Extract information from the provided research data.
-            **The output must be EXTREMELY CONCISE, FACTUAL, and SHORT (less than 100 words).**
-            **DO NOT** use introductory phrases like 'Based on the provided research data,' 'Here is the extracted information,' or similar conversational filler.
-            Start directly with the extracted data point. Omit source mentions from the main text body."""),
+            SystemMessage(content=f"""You are an expert research analyst. Extract FACTUAL DATA ONLY from the provided research context for {company_name}.
+            **The output must be EXTREMELY CONCISE, FACTUAL, and SHORT (under 100 words).**
+            **DO NOT** use any introductory phrases, conversational fillers, or descriptive headers.
+            Start the output directly with the correct data point. Omit source mentions from the main text body."""),
             HumanMessage(content=prompt)
         ]).content.strip()
         
@@ -375,35 +373,32 @@ def dynamic_extract_field_with_sources(company_name: str, field_name: str, searc
             len(response) < 5):
             return "N/A"
         
-        # --- CRITICAL MODIFICATION: Aggressive Cleaning for Conversational Fillers ---
+        # --- CRITICAL MODIFICATION: Expanded Aggressive Cleaning ---
+        # Added more patterns to catch LLM conversational habits and clean up list markers
         clean_up_phrases = [
-            r'^Based on the provided research data, here\'s the extracted comprehensive information about.*:',
-            r'^Based on the provided research data, here\'s the extracted financial information for.*:',
-            r'^Based on the provided research data, the complete official headquarters address for.* is:',
-            r'^Based on the provided research data, here are the recent expansion and growth news for.*:',
-            r'^Based on the provided research data, here is the extracted comprehensive information about.*:',
-            r'^Based on the provided research data, I was unable to find any information about.*. However, I can provide some information about.*:',
-            r'^Based on the provided research data, here are the extracted digital transformation and IT initiatives for.*:',
-            r'^Based on the provided research data, here\'s the extracted network information for.*:',
-            r'^Based on the provided research data, here\'s the extracted employee count information for.*:',
-            r'^Based on the provided research data, the extracted physical infrastructure developments for.* are as follows:',
-            r'^Based on the provided research data, here\'s the extracted IT infrastructure budget and capital expenditure information for.*:',
+            r'^\s*Based on the provided research data,.*:',
             r'^\s*Here is the extracted information:',
             r'^\s*The key information is:',
             r'^\s*Extracted information:',
-            r'^\s*The headquarters address is:',
             r'^\s*The relevant data is:',
-            r'^\s*Here\'s the comprehensive information about the industry categor', # Specific to the user's bad output
-            r'^\s*Neuberg Diagnostics has:',
-            r'^\s*The headquarters address for Neuberg Diagnostics is:',
+            r'^\s*Here\'s the comprehensive information about the industry categor', 
+            r'^\s*The headquarters address for [A-Za-z\s]+ is:',
             r'^\s*Annual Revenue:',
             r'^\s*Components of the address:',
+            r'^\s*Key Financial Facts:',
+            r'^\s*New facilities:',
+            r'^\s*Geographic expansions:',
+            r'^\s*Snowman Logistics has:',
+            r'^\s*[A-Za-z\s]+ has:',
+            r'^\s*\*\s*', # Remove list marker at start
+            r'^\s*-\s*', # Remove list marker at start
+            r'^\s*\d+\.\s*', # Remove numbered list marker at start
         ]
         
         for phrase in clean_up_phrases:
             response = re.sub(phrase, '', response, flags=re.IGNORECASE | re.DOTALL).strip()
 
-        # Clean further
+        # Final Cleaning
         response = re.sub(r'https?://\S+', '', response)  # Remove stray URLs
         response = re.sub(r'\n+', ' ', response).strip() # Replace all newlines with a single space
         response = re.sub(r'\s+', ' ', response) # Consolidate multiple spaces
@@ -419,13 +414,12 @@ def dynamic_extract_field_with_sources(company_name: str, field_name: str, searc
                 source_text = f" [Sources: {', '.join(unique_urls[:2])}]" if len(unique_urls) > 1 else f" [Source: {unique_urls[0]}]"
                 response += source_text
         
-        return response[:500]  # Reasonable length limit
+        return response[:500]
             
     except Exception as e:
         return "N/A"
 
 # --- Enhanced Relevance Analysis ---
-# No changes here, as relevance analysis should remain detailed, not shortened.
 def generate_dynamic_relevance_analysis(company_data: Dict, company_name: str, all_search_results: List[Dict]) -> tuple:
     """Generate comprehensive relevance analysis"""
     
@@ -509,7 +503,8 @@ def generate_dynamic_relevance_analysis(company_data: Dict, company_name: str, a
         
         # Ensure we have 3 quality bullets
         while len(bullets) < 3:
-            bullets.append(f"• Strategic IT service opportunity identified for {company_name} based on business growth patterns")
+            # Modified fallback to be less conversational
+            bullets.append(f"• Potential IT service opportunity based on company growth and operational strategy.")
         
         # Clean bullets
         cleaned_bullets = []
@@ -522,9 +517,10 @@ def generate_dynamic_relevance_analysis(company_data: Dict, company_name: str, a
         return formatted_bullets, score
         
     except Exception as e:
-        fallback_bullets = f"""• Digital transformation opportunity based on business expansion
-• IT infrastructure modernization potential from growth signals
-• Automation and efficiency optimization alignment with Syntel expertise"""
+        # Finalized fallback for complete failure
+        fallback_bullets = """• IT infrastructure modernization alignment due to expansion signals.
+• Opportunity for Digital Transformation based on technology adoption.
+• Process optimization and automation potential aligns with Syntel expertise."""
         return fallback_bullets, "Medium"
 
 # --- Main Research Function ---
@@ -578,7 +574,7 @@ def dynamic_research_company_intelligence(company_name: str) -> Dict[str, Any]:
     
     return company_data
 
-# --- Display Functions (Requires completion/formatting) ---
+# --- Display Functions ---
 def format_concise_display_with_sources(company_input: str, data_dict: dict) -> pd.DataFrame:
     """Transform data into clean, professional display format"""
     
@@ -611,14 +607,7 @@ def format_concise_display_with_sources(company_input: str, data_dict: dict) -> 
         else:
             value = data_dict.get(data_field, "N/A")
         
-        # For basic fields, return clean data only
-        if display_col in ["LinkedIn URL", "Company Website URL", "Industry Category"]:
-            data_list.append({"Column Header": display_col, "Value": str(value)})
-        
-        # Format relevance bullets
-        # Since the provided code was truncated, I'll provide a standard DataFrame creation for the remaining fields
-        else:
-            data_list.append({"Column Header": display_col, "Value": str(value)})
+        data_list.append({"Column Header": display_col, "Value": str(value)})
             
     df = pd.DataFrame(data_list)
     return df
