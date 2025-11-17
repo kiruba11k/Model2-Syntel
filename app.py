@@ -221,12 +221,34 @@ def clean_text_content(text: str) -> str:
     
     return text.strip()
 
+# --- FIXED: Extract Single LinkedIn URL ---
+def extract_single_linkedin_url(search_results: List[Dict]) -> str:
+    """Extract a single, clean LinkedIn URL from search results"""
+    linkedin_urls = []
+    
+    for result in search_results:
+        content = result.get('content', '').lower()
+        url = result.get('url', '')
+        
+        # Look for LinkedIn URLs in content or URL
+        if 'linkedin.com/company' in url.lower() or 'linkedin.com/company' in content:
+            clean_url = clean_and_format_url(url)
+            if clean_url not in linkedin_urls:
+                linkedin_urls.append(clean_url)
+    
+    # Return the first valid LinkedIn URL or N/A
+    return linkedin_urls[0] if linkedin_urls else "N/A"
+
 # --- FIXED: Dynamic Extraction with Clean Formatting ---
 def dynamic_extract_field_with_sources(company_name: str, field_name: str, search_results: List[Dict]) -> str:
     """Dynamically extract information based on actual search results"""
     
     if not search_results:
         return "N/A"
+    
+    # SPECIAL HANDLING: For LinkedIn URL, extract only one URL without sources
+    if field_name == "linkedin_url":
+        return extract_single_linkedin_url(search_results)
     
     # Format research data for context
     research_context = f"Research context for {field_name}:\n"
@@ -252,7 +274,7 @@ def dynamic_extract_field_with_sources(company_name: str, field_name: str, searc
         
         "industry_category": f"""
         Extract the primary industry/business category for {company_name} based on the research.
-        Be specific: 'Clinical Laboratory Testing', 'Healthcare Diagnostics', 'Medical Services', etc.
+        Be specific: 'Temperature Controlled Logistics', 'Cold Chain Logistics', 'Supply Chain', etc.
         Return 2-4 word category only.
         """,
         
@@ -366,15 +388,20 @@ def dynamic_extract_field_with_sources(company_name: str, field_name: str, searc
         # Clean the response
         response = clean_text_content(response)
         
-        # Special handling for URL fields
-        if field_name in ['linkedin_url', 'company_website_url']:
+        # Special handling for URL fields (except LinkedIn which is handled separately)
+        if field_name in ['company_website_url']:
             response = clean_and_format_url(response)
+            return response  # No sources for company website URL
+        
+        # For industry category, return just the data without sources
+        if field_name == 'industry_category':
+            return response
         
         # Limit response length
         response = response[:250].strip()
         
-        # Add source URLs if we have valid information (except for URL fields)
-        if unique_urls and response != "N/A" and field_name not in ['linkedin_url', 'company_website_url']:
+        # Add source URLs if we have valid information (for all other fields)
+        if unique_urls and response != "N/A":
             source_text = f" [Sources: {', '.join(unique_urls[:2])}]" if len(unique_urls) > 1 else f" [Source: {unique_urls[0]}]"
             response += source_text
             
@@ -574,8 +601,12 @@ def format_concise_display_with_sources(company_input: str, data_dict: dict) -> 
             if display_col in ["LinkedIn URL", "Company Website URL"]:
                 value = clean_and_format_url(value)
         
+        # For the three specific fields, return only the data without sources
+        if display_col in ["LinkedIn URL", "Company Website URL", "Industry Category"]:
+            data_list.append({"Column Header": display_col, "Value": str(value)})
+        
         # Format bullet points for relevance section
-        if data_field == "why_relevant_to_syntel_bullets":
+        elif data_field == "why_relevant_to_syntel_bullets":
             if isinstance(value, str) and value != "N/A":
                 # Clean and format bullets
                 cleaned_value = value.replace('1)', '•').replace('2)', '•').replace('3)', '•')
@@ -586,7 +617,7 @@ def format_concise_display_with_sources(company_input: str, data_dict: dict) -> 
             else:
                 data_list.append({"Column Header": display_col, "Value": str(value)})
         else:
-            # For fields with source URLs, format them cleanly
+            # For all other fields with source URLs, format them cleanly
             if isinstance(value, str) and "http" in value and "Source" in value:
                 # Extract the main content and sources separately
                 main_content = value.split(' [Source')[0] if ' [Source' in value else value
@@ -650,7 +681,7 @@ with st.expander("🚀 Dynamic Research Approach", expanded=True):
 # Input section
 col1, col2 = st.columns([2, 1])
 with col1:
-    company_input = st.text_input("Enter the company name to research:", "Neuberg Diagnostics")
+    company_input = st.text_input("Enter the company name to research:", "Snowman Logistics")
 with col2:
     with st.form("research_form"):
         submitted = st.form_submit_button("🚀 Start Dynamic Research", type="primary")
