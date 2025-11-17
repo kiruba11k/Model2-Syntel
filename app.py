@@ -13,7 +13,6 @@ from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain_core.messages import SystemMessage, HumanMessage
 
 # --- Configuration & Environment Setup ---
-# Assume these are correctly set in Streamlit secrets
 TAVILY_API_KEY = st.secrets.get("TAVILY_API_KEY")
 GROQ_API_KEY = st.secrets.get("GROQ_API_KEY")
 
@@ -45,10 +44,10 @@ REQUIRED_FIELDS = [
     "why_relevant_to_syntel_bullets", "intent_scoring_level"
 ]
 
-# --- Core Functions ---
+# --- Core Functions (Unchanged from previous final version) ---
 
 def clean_and_format_url(url: str) -> str:
-    """Clean and format URLs"""
+    # ... (function body omitted for brevity, it remains unchanged) ...
     if not url or url == "N/A":
         return "N/A"
     if url.startswith('//'):
@@ -58,8 +57,7 @@ def clean_and_format_url(url: str) -> str:
     return url.replace(' ', '').strip()
 
 def generate_dynamic_search_queries(company_name: str, field_name: str) -> List[str]:
-    """Generate dynamic search queries based on company and field"""
-    
+    # ... (function body omitted for brevity, it remains unchanged) ...
     field_queries = {
         "linkedin_url": [f'"{company_name}" LinkedIn company page'],
         "company_website_url": [f'"{company_name}" official website'],
@@ -78,11 +76,10 @@ def generate_dynamic_search_queries(company_name: str, field_name: str) -> List[
         "physical_infrastructure_signals": [f'"{company_name}" new construction facility expansion'],
         "it_infra_budget_capex": [f'"{company_name}" IT budget capex investment technology spending']
     }
-    
     return field_queries.get(field_name, [f'"{company_name}" {field_name}'])
 
 def dynamic_search_for_field(company_name: str, field_name: str) -> List[Dict]:
-    """Dynamic search for specific field information with multiple query attempts"""
+    # ... (function body omitted for brevity, it remains unchanged) ...
     queries = generate_dynamic_search_queries(company_name, field_name)
     all_results = []
     
@@ -105,12 +102,10 @@ def dynamic_search_for_field(company_name: str, field_name: str) -> List[Dict]:
                             })
         except Exception:
             continue
-    
     return all_results
 
 def get_detailed_extraction_prompt(company_name: str, field_name: str, research_context: str) -> str:
-    """Get detailed extraction prompts for each field with strict single-fact requirements"""
-    
+    # ... (function body omitted for brevity, it remains unchanged) ...
     prompts = {
         "industry_category": f"""Analyze the research data and provide ONLY the single best-fit, primary industry category for {company_name}.
         RESEARCH DATA: {research_context}
@@ -132,7 +127,6 @@ def get_detailed_extraction_prompt(company_name: str, field_name: str, research_
         REQUIREMENTS: - Output ONE single value (e.g., 'USD 19.3 million (FY 2025-26 Est.)' or 'USD 450M Annual Revenue (FY 2024)'). - Start directly with the extracted data.
         EXTRACTED REVENUE INFORMATION:
         """,
-        # --- MODIFIED PROMPT FOR HIGH ACCURACY ---
         "branch_network_count": f"""
         Analyze the research data and extract ONLY the **latest, consolidated total** of physical facilities/warehouses/locations and their capacity/city count for {company_name}.
         
@@ -146,7 +140,6 @@ def get_detailed_extraction_prompt(company_name: str, field_name: str, research_
         
         EXTRACTED NETWORK COUNT:
         """,
-        # --- MODIFIED PROMPT FOR HIGH ACCURACY ---
         "expansion_news_12mo": f"""
         Extract ONLY the most recent and significant expansion news for {company_name} from the **last 12-24 months (2024 and 2025/2026)**. Consolidate new facilities, geographic expansions, and fleet/capacity additions.
         
@@ -201,23 +194,17 @@ def get_detailed_extraction_prompt(company_name: str, field_name: str, research_
         EXTRACTED IT BUDGET INFORMATION:
         """
     }
-    
     return prompts.get(field_name, f"""
     Extract ONLY the comprehensive, short, and correct information about {field_name} for {company_name}.
     
-    RESEARCH DATA:
-    {research_context}
+    RESEARCH DATA: {research_context}
     
-    REQUIREMENTS:
-    - Output must be short, factual, and extremely concise.
-    - Start directly with the extracted data.
-    
+    REQUIREMENTS: - Output must be short, factual, and extremely concise. - Start directly with the extracted data.
     EXTRACTED INFORMATION:
     """)
 
 def dynamic_extract_field_with_sources(company_name: str, field_name: str, search_results: List[Dict]) -> str:
-    """Enhanced extraction with better source utilization and accuracy"""
-    
+    # ... (function body omitted for brevity, it remains unchanged) ...
     if not search_results:
         return "N/A"
     
@@ -289,7 +276,122 @@ def dynamic_extract_field_with_sources(company_name: str, field_name: str, searc
     except Exception as e:
         return "N/A"
 
-# --- Main Research Function (Unchanged) ---
+
+# --- DEDICATED RELEVANCE FUNCTION (REPLACES OLD ONE) ---
+
+def syntel_relevance_analysis_v2(company_data: Dict, company_name: str) -> tuple:
+    """
+    Generates relevance analysis and intent score strictly based on the provided Syntel GTM profile.
+    This function generates the output in the desired TSV format within the LLM.
+    """
+    
+    # 1. Prepare data context for the LLM
+    context_lines = []
+    for field, value in company_data.items():
+        if value and value != "N/A" and field not in ["why_relevant_to_syntel_bullets", "intent_scoring_level"]:
+            clean_value = re.sub(r'\[Sources?:[^\]]+\]', '', value).strip()
+            context_lines.append(f"{field.replace('_', ' ').title()}: {clean_value}")
+    
+    data_context = "\n".join(context_lines)
+
+    # 2. Define the strict GTM prompt
+    relevance_prompt = f"""
+    You are evaluating whether the company below is relevant to Syntel’s Go-To-Market for Wi-Fi & Network Integration.
+    
+    ---
+    **SYNTEL GTM FOCUS**
+    **Geography:** India
+    **Industries:** Ports, Stadiums, Education, Manufacturing, Healthcare, Hospitality, **Warehouses**, BFSI, IT/ITES, GCCs
+    **ICP:** 150–500+ employees, ₹100 Cr+ revenue
+    **Key Buying Signals (HIGH INTENT):**
+    - Opening or expanding factories, offices, campuses, **warehouses** (especially 2024/2025/2026 dates).
+    - Digital transformation / cloud modernization
+    - Wi-Fi or LAN upgrade signals
+    - **IoT/automation (AGVs, robots, sensors)**
+    - Leadership changes (CIO/CTO/Infra head)
+    - Large physical spaces needing wireless coverage
+    
+    **Offerings:** Wi-Fi deployments, Network integration & managed services, Multi-vendor implementation (Altai + others), Full implementation support.
+    ---
+    
+    **COMPANY DETAILS TO ANALYZE ({company_name}):**
+    {data_context}
+    
+    **TASK:**
+    1. Determine the Intent Score (High / Medium / Low) based *only* on the Buying Signals present in the Company Details.
+    2. Generate a 3-bullet point summary for "Why Relevant to Syntel." The bullets **MUST be specific and directly reference the company's data (e.g., 'New facility construction in Pune signals immediate need for network.')**.
+    3. Output the final result in the exact TSV format specified below.
+    
+    **OUTPUT FORMAT (TSV):**
+    Company Name\tWhy Relevant to Syntel\tIntent (High / Medium / Low)
+    
+    **RULES:**
+    - "Why Relevant" must contain the 3 bullet points, separated by a newline.
+    - Do not include headers in the output.
+    - Ensure the bullets are short and professional.
+    """
+    
+    # 3. Invoke LLM and parse output
+    try:
+        response = llm_groq.invoke([
+            SystemMessage(content="You are a meticulous GTM analyst. Generate the output *only* in the requested TSV format, following all rules for specificity and score assignment."),
+            HumanMessage(content=relevance_prompt)
+        ]).content.strip()
+        
+        # Robust parsing of the TSV output
+        parts = response.split('\t')
+        if len(parts) == 3:
+            company, relevance_text, score = parts
+            
+            # Clean and format the relevance text into the desired bullet format
+            bullets = relevance_text.split('\n')
+            
+            # Use a robust cleaning for the bullets
+            cleaned_bullets = []
+            for bullet in bullets:
+                clean_bullet = re.sub(r'^[•\-\s]*', '• ', bullet.strip())
+                clean_bullet = re.sub(r'\*\*|\*|__|_', '', clean_bullet)
+                if len(clean_bullet) > 5: # Ensure it's not empty
+                    cleaned_bullets.append(clean_bullet)
+
+            # Ensure exactly 3 bullets are returned, padding with a generic one if needed
+            while len(cleaned_bullets) < 3:
+                 cleaned_bullets.append("• Strategic relevance due to being a target industry.")
+            
+            formatted_bullets = "\n".join(cleaned_bullets[:3])
+            return formatted_bullets, score.strip()
+        
+        # Fallback if TSV parsing fails
+        raise ValueError("LLM response not in expected TSV format.")
+
+    except Exception:
+        # Intelligent Fallback: Construct generic but relevant bullets from existing data
+        
+        fallback_bullets_list = []
+        
+        # 1. Expansion Signal
+        if company_data.get('expansion_news_12mo') not in ["N/A", ""]:
+             fallback_bullets_list.append(f"• Recent expansion ({company_data['expansion_news_12mo'][:60]}...) signals immediate need for network planning and deployment.")
+        else:
+             fallback_bullets_list.append("• Company operates in the warehouse/logistics sector, a primary target industry for Syntel's network GTM.")
+
+        # 2. Automation/IoT Signal
+        if company_data.get('iot_automation_edge_integration') not in ["N/A", ""]:
+             fallback_bullets_list.append(f"• IoT/Automation initiatives ({company_data['iot_automation_edge_integration'][:60]}...) require high-performance, seamless Wi-Fi coverage across large facilities.")
+        else:
+             fallback_bullets_list.append("• Large facility operation and logistics demands stable, wide-area network coverage, aligning with the Altai differentiation.")
+
+        # 3. Financial/General Signal
+        if company_data.get('revenue_source') not in ["N/A", ""]:
+             fallback_bullets_list.append(f"• Financial scale ({company_data['revenue_source'][:30]}...) confirms the ICP revenue size, indicating budget availability for infra projects.")
+        else:
+             fallback_bullets_list.append("• Company's scale and growth trajectory point to high future capex for IT infrastructure modernization.")
+
+        return "\n".join(fallback_bullets_list), "Medium"
+
+
+# --- Main Research Function (Updated to use V2) ---
+
 def dynamic_research_company_intelligence(company_name: str) -> Dict[str, Any]:
     """Main function to conduct comprehensive company research"""
     
@@ -322,13 +424,15 @@ def dynamic_research_company_intelligence(company_name: str) -> Dict[str, Any]:
     progress_bar.progress(90)
     
     try:
-        relevance_bullets, intent_score = generate_dynamic_relevance_analysis(
-            company_data, company_name, all_search_results
+        # --- CRITICAL CHANGE: Use the new V2 function ---
+        relevance_bullets, intent_score = syntel_relevance_analysis_v2(
+            company_data, company_name
         )
         company_data["why_relevant_to_syntel_bullets"] = relevance_bullets
         company_data["intent_scoring_level"] = intent_score
     except Exception:
-        company_data["why_relevant_to_syntel_bullets"] = "• Comprehensive analysis in progress based on company growth and technology initiatives"
+        # This only catches errors in syntel_relevance_analysis_v2 itself, not the LLM call error
+        company_data["why_relevant_to_syntel_bullets"] = "• Analysis failure: Check core data points for LLM processing."
         company_data["intent_scoring_level"] = "Medium"
     
     progress_bar.progress(100)
@@ -336,116 +440,8 @@ def dynamic_research_company_intelligence(company_name: str) -> Dict[str, Any]:
     
     return company_data
 
-# --- Enhanced Relevance Analysis Function (Focusing on Syntel's Network GTM) ---
-# --- Enhanced Relevance Analysis Function (Focusing on Syntel's Network GTM) ---
-def generate_dynamic_relevance_analysis(company_data: Dict, company_name: str, all_search_results: List[Dict]) -> tuple:
-    """Generate comprehensive relevance analysis, prioritizing Network Integration and Expansion."""
-    
-    context_lines = []
-    for field, value in company_data.items():
-        if value and value != "N/A" and field not in ["why_relevant_to_syntel_bullets", "intent_scoring_level"]:
-            clean_value = re.sub(r'\[Sources?:[^\]]+\]', '', value).strip()
-            if clean_value and clean_value != "N/A":
-                context_lines.append(f"{field.replace('_', ' ').title()}: {clean_value}")
-    
-    context = "\n".join(context_lines)
-    unique_urls = list(set([result['url'] for result in all_search_results if result.get('url')]))[:3]
-    source_context = f"Research sources: {', '.join(unique_urls)}" if unique_urls else "Based on comprehensive research"
-    
-    relevance_prompt = f"""
-    COMPANY: {company_name} 
-    Industry: {company_data.get('industry_category', 'Not specified')}
-    {source_context}
-    
-    DETAILED COMPANY DATA:
-    {context}
-    
-    SYNTEL CORE EXPERTISE (Network Integration & GTM Focus):
-    1. Target Industries: Warehouses, Manufacturing, Healthcare, Education, GCCs (all facilities with large spaces).
-    2. Primary Need: New **Wi-Fi / Network Integration** for expansion, better coverage, and seamless IoT/handheld connectivity.
-    3. Differentiation: Altai WiFi provides **3-5x coverage, seamless roaming (Zero-Roaming Drop)**, and is ideal for large, complex spaces like warehouses.
-    4. Service: End-to-end multi-brand deployment and integration support (One Partner. End-to-End Connectivity).
-    
-    TASK: Analyze the DETAILED COMPANY DATA. Create 3 meaningful, evidence-based bullet points explaining the relevance to Syntel's Network Integration GTM strategy. The bullets must be *specific* to the company's data points (Expansion News, IoT, Revenue, etc.).
-    
-    Then provide an INTENT SCORE: High/Medium/Low based on concrete business and technology signals.
-    
-    High Intent Signals:
-    - Recent or announced expansion/new facilities (2024/2025/2026 dates).
-    - Mention of IoT, Automation, or Edge Integration.
-    - Large revenue/employee growth suggesting IT budget investment.
-    
-    FORMAT:
-    BULLETS:
-    1. [Specific Data Point from Research] - [Syntel's Core Offering] - [Calculated Opportunity]
-    2. [Operational Challenge/Technology Gap] - [Syntel's Differentiation (Altai)] - [Specific Benefit]
-    3. [Strategic IT Need] - [Syntel's Service Model] - [Strategic Opportunity]
-    SCORE: High/Medium/Low
-    
-    Be specific, use the facts provided, and focus on actionable network modernization opportunities.
-    """
-    
-    try:
-        response = llm_groq.invoke([
-            SystemMessage(content="You are a strategic business analyst. Provide highly specific, evidence-based analysis *directly referencing* the provided company data to justify the relevance. DO NOT use generic or repetitive statements."),
-            HumanMessage(content=relevance_prompt)
-        ]).content
-        
-        # Parse response
-        bullets = []
-        score = "Medium"
-        
-        lines = response.split('\n')
-        bullet_section = False
-        
-        for line in lines:
-            line = line.strip()
-            if line.startswith('BULLETS:') or bullet_section:
-                bullet_section = True
-                if (line.startswith(('1', '2', '3', '•', '-')) and len(line) > 10 and 
-                    not line.startswith('SCORE:')):
-                    clean_line = re.sub(r'^[1-3][\.\)]\s*', '', line)
-                    clean_line = re.sub(r'^[•\-]\s*', '', clean_line)
-                    bullets.append(f"• {clean_line}")
-            elif 'SCORE:' in line.upper():
-                if 'HIGH' in line.upper():
-                    score = "High"
-                elif 'LOW' in line.upper():
-                    score = "Low"
-                bullet_section = False
-        
-        # Fallback for parsing failure - now more specific to GTM
-        if len(bullets) < 3:
-             fallback_bullets_list = [
-                f"• Significant expansion (e.g., {company_data.get('expansion_news_12mo', 'new facilities')}) creates immediate network rollout needs, aligning with Syntel's deployment expertise.",
-                "• As a large facility operator (Warehouses, etc.), the need for wide-area Wi-Fi coverage is high, an ideal fit for Syntel's differentiated Altai solution (3-5x coverage).",
-                f"• Technology adoption ({company_data.get('iot_automation_edge_integration', 'IoT/automation')}) requires seamless, high-speed roaming, which Syntel can deliver via network integration."
-             ]
-             bullets = fallback_bullets_list
-             if "new facilities" not in bullets[0] and "IoT/automation" not in bullets[2]:
-                 score = "Medium" # Lower the score if key data points weren't found/used
-             else:
-                 score = "High"
-
-        # Clean bullets
-        cleaned_bullets = []
-        for bullet in bullets[:3]:
-            clean_bullet = re.sub(r'\*\*|\*|__|_', '', bullet)
-            clean_bullet = re.sub(r'\s+', ' ', clean_bullet).strip()
-            cleaned_bullets.append(clean_bullet)
-        
-        formatted_bullets = "\n".join(cleaned_bullets)
-        return formatted_bullets, score
-        
-    except Exception:
-        # Final safety net fallback
-        fallback_bullets = """• High relevance as a target industry (logistics/warehouse operator).
-• Facility expansion signals a strong need for network deployment and integration services (GTM Focus).
-• Opportunity to deploy differentiated Wi-Fi technology to support large-scale automation/IoT initiatives."""
-        return fallback_bullets, "Medium"
-
 def format_concise_display_with_sources(company_input: str, data_dict: dict) -> pd.DataFrame:
-    """Transform data into clean, professional display format (Unchanged)"""
+    """Transform data into clean, professional display format"""
     
     mapping = {
         "Company Name": "company_name", "LinkedIn URL": "linkedin_url", "Company Website URL": "company_website_url", 
