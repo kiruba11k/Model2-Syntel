@@ -126,7 +126,7 @@ def generate_dynamic_search_queries(company_name: str, field_name: str) -> List[
     
     return field_queries.get(field_name, [f'"{company_name}" {field_name}'])
 
-# --- Enhanced Dynamic Extraction Functions ---
+# --- FIXED: Enhanced Dynamic Search Function with Robust Error Handling ---
 def dynamic_search_for_field(company_name: str, field_name: str) -> List[Dict]:
     """Dynamic search for specific field information with multiple query attempts"""
     queries = generate_dynamic_search_queries(company_name, field_name)
@@ -137,23 +137,47 @@ def dynamic_search_for_field(company_name: str, field_name: str) -> List[Dict]:
             time.sleep(1.2)  # Rate limiting
             results = search_tool.invoke({"query": query, "max_results": 3})
             
-            if results:
+            # FIX: Handle different types of responses
+            if isinstance(results, str):
+                # If it's a string error, log and skip
+                st.warning(f"Search returned error for '{query}': {results}")
+                continue
+                
+            elif isinstance(results, list):
+                # Normal case - process list of results
                 for result in results:
-                    content = result.get('content', '')
-                    if len(content) > 50:  # Filter out very short results
-                        all_results.append({
-                            "title": result.get('title', ''),
-                            "content": content[:500],  # Increased context
-                            "url": result.get('url', ''),
-                            "field": field_name,
-                            "query": query
-                        })
+                    if isinstance(result, dict):
+                        content = result.get('content', '') or result.get('snippet', '')
+                        if len(content) > 50:  # Filter out very short results
+                            all_results.append({
+                                "title": result.get('title', ''),
+                                "content": content[:500],
+                                "url": result.get('url', ''),
+                                "field": field_name,
+                                "query": query
+                            })
+                    else:
+                        st.warning(f"Unexpected result type: {type(result)}")
+                        
+            elif isinstance(results, dict):
+                # Single result case
+                content = results.get('content', '') or results.get('snippet', '')
+                if len(content) > 50:
+                    all_results.append({
+                        "title": results.get('title', ''),
+                        "content": content[:500],
+                        "url": results.get('url', ''),
+                        "field": field_name,
+                        "query": query
+                    })
+                    
         except Exception as e:
             st.warning(f"Search failed for query '{query}': {str(e)[:100]}...")
             continue
     
     return all_results
 
+# --- FIXED: Dynamic Extraction with Fallback ---
 def dynamic_extract_field_with_sources(company_name: str, field_name: str, search_results: List[Dict]) -> str:
     """Dynamically extract information based on actual search results"""
     
@@ -162,14 +186,14 @@ def dynamic_extract_field_with_sources(company_name: str, field_name: str, searc
     
     # Format research data for context
     research_context = f"Research context for {field_name}:\n"
-    for i, result in enumerate(search_results[:3]):  # Use top 3 results
+    for i, result in enumerate(search_results[:3]):
         research_context += f"[Source {i+1}]: {result['content'][:300]}\n"
         research_context += f"[URL {i+1}]: {result['url']}\n\n"
     
     # Get unique source URLs
-    unique_urls = list(set([result['url'] for result in search_results]))[:2]
+    unique_urls = list(set([result['url'] for result in search_results if result.get('url')]))[:2]
     
-    # Dynamic extraction prompts that adapt to actual search results
+    # Dynamic extraction prompts
     extraction_prompts = {
         "linkedin_url": f"""
         Extract the LinkedIn company page URL for {company_name} from the research.
@@ -295,7 +319,6 @@ def dynamic_extract_field_with_sources(company_name: str, field_name: str, searc
         
         # Clean up any explanatory text
         if ":" in response and len(response.split(":")) > 1:
-            # Take only the part after the first colon if it seems explanatory
             parts = response.split(":", 1)
             if len(parts[0].split()) < 4:  # If first part is short label
                 response = parts[1].strip()
@@ -314,6 +337,7 @@ def dynamic_extract_field_with_sources(company_name: str, field_name: str, searc
         st.warning(f"Extraction failed for {field_name}: {str(e)[:100]}...")
         return "N/A"
 
+# --- FIXED: Generate Relevance Analysis with Fallback ---
 def generate_dynamic_relevance_analysis(company_data: Dict, company_name: str, all_search_results: List[Dict]) -> tuple:
     """Generate dynamic relevance analysis based on actual company data"""
     
@@ -326,7 +350,7 @@ def generate_dynamic_relevance_analysis(company_data: Dict, company_name: str, a
     context = "\n".join(context_lines)
     
     # Get unique source URLs for credibility
-    unique_urls = list(set([result['url'] for result in all_search_results]))[:3]
+    unique_urls = list(set([result['url'] for result in all_search_results if result.get('url')]))[:3]
     source_context = f"Research sources: {', '.join(unique_urls)}" if unique_urls else "Based on comprehensive research"
     
     relevance_prompt = f"""
@@ -398,7 +422,7 @@ def generate_dynamic_relevance_analysis(company_data: Dict, company_name: str, a
 • Potential alignment with Syntel's automation expertise"""
         return fallback_bullets, "Medium"
 
-# --- Main Research Function ---
+# --- FIXED: Main Research Function with Better Error Handling ---
 def dynamic_research_company_intelligence(company_name: str) -> Dict[str, Any]:
     """Main function to dynamically research all fields"""
     
@@ -415,31 +439,42 @@ def dynamic_research_company_intelligence(company_name: str) -> Dict[str, Any]:
         progress_bar.progress(int(progress))
         status_text.info(f"🔍 Researching {field.replace('_', ' ').title()} for {company_name}...")
         
-        # Dynamic search and extraction
-        search_results = dynamic_search_for_field(company_name, field)
-        all_search_results.extend(search_results)
-        
-        field_data = dynamic_extract_field_with_sources(company_name, field, search_results)
-        company_data[field] = field_data
-        
-        time.sleep(1.5)  # Rate limiting
+        try:
+            # Dynamic search and extraction
+            search_results = dynamic_search_for_field(company_name, field)
+            all_search_results.extend(search_results)
+            
+            field_data = dynamic_extract_field_with_sources(company_name, field, search_results)
+            company_data[field] = field_data
+            
+            time.sleep(1.5)  # Rate limiting
+            
+        except Exception as e:
+            st.warning(f"Research failed for {field}: {str(e)[:100]}...")
+            company_data[field] = "N/A"
+            continue
     
     # Generate dynamic relevance analysis
     status_text.info("🤔 Analyzing Syntel relevance...")
     progress_bar.progress(90)
     
-    relevance_bullets, intent_score = generate_dynamic_relevance_analysis(
-        company_data, company_name, all_search_results
-    )
-    company_data["why_relevant_to_syntel_bullets"] = relevance_bullets
-    company_data["intent_scoring_level"] = intent_score
+    try:
+        relevance_bullets, intent_score = generate_dynamic_relevance_analysis(
+            company_data, company_name, all_search_results
+        )
+        company_data["why_relevant_to_syntel_bullets"] = relevance_bullets
+        company_data["intent_scoring_level"] = intent_score
+    except Exception as e:
+        st.warning(f"Relevance analysis failed: {str(e)[:100]}...")
+        company_data["why_relevant_to_syntel_bullets"] = "• Analysis pending additional company data"
+        company_data["intent_scoring_level"] = "Medium"
     
     progress_bar.progress(100)
     status_text.success("✅ Research complete!")
     
     return company_data
 
-# --- Display Functions (unchanged from your original) ---
+# --- Display Functions ---
 def format_concise_display_with_sources(company_input: str, data_dict: dict) -> pd.DataFrame:
     """Transform data into concise display format with sources"""
     
@@ -573,7 +608,7 @@ if submitted:
                 with col3:
                     st.metric("Intent Score", company_data.get("intent_scoring_level", "Medium"))
             
-            # Download options (unchanged from your original)
+            # Download options
             st.subheader("💾 Download Report")
             
             def to_excel(df):
@@ -614,7 +649,7 @@ if submitted:
             st.error(f"Research failed: {type(e).__name__} - {str(e)}")
             st.info("This might be due to API rate limits or search constraints. Please try again in a few moments.")
 
-# Research History (unchanged from your original)
+# Research History
 if 'research_history' not in st.session_state:
     st.session_state.research_history = []
 
