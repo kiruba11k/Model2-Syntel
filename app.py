@@ -475,6 +475,10 @@ st.set_page_config(
 st.title("Syntel Company Intelligence Research")
 st.markdown("### Comprehensive Business Intelligence Reporting")
 
+# Initialize session state
+if 'research_history' not in st.session_state:
+    st.session_state.research_history = []
+
 # Input section
 col1, col2 = st.columns([2, 1])
 with col1:
@@ -488,7 +492,8 @@ if submitted:
         st.warning("Please enter a company name.")
         st.stop()
 
-    with st.spinner(f"Conducting comprehensive research for {company_name}..."):
+    # FIX: Use company_input instead of company_name
+    with st.spinner(f"Conducting comprehensive research for {company_input}..."):
         try:
             # Perform research
             company_data = comprehensive_company_research(company_input)
@@ -551,23 +556,18 @@ if submitted:
                      file_name=f"{company_input.replace(' ', '_')}_research_data.xlsx",
                      mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                  )
+            
+            # Store current research in history
+            research_entry = {
+                "company": company_input,
+                "timestamp": datetime.now().isoformat(),
+                "data": company_data
+            }
+            st.session_state.research_history.append(research_entry)
                         
         except Exception as e:
             st.error(f"Research failed: {type(e).__name__} - {str(e)}")
             st.info("This might be due to API rate limits. Please try again in a few moments.")
-
-# Initialize session state
-if 'research_history' not in st.session_state:
-    st.session_state.research_history = []
-
-# Store current research
-if submitted and 'company_data' in locals():
-    research_entry = {
-        "company": company_input,
-        "timestamp": datetime.now().isoformat(),
-        "data": company_data
-    }
-    st.session_state.research_history.append(research_entry)
 
 # Research History
 if st.session_state.research_history:
