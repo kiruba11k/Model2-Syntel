@@ -34,7 +34,7 @@ except Exception as e:
     st.error(f"Failed to initialize Groq or Tavily tools: {e}")
     st.stop()
 
-# --- Required Fields Definition ---
+# --- Required Fields Definition (No Change) ---
 REQUIRED_FIELDS = [
     "linkedin_url", "company_website_url", "industry_category", 
     "employee_count_linkedin", "headquarters_location", "revenue_source",
@@ -45,146 +45,7 @@ REQUIRED_FIELDS = [
     "why_relevant_to_syntel_bullets", "intent_scoring_level"
 ]
 
-# --- Syntel Core Offerings (No Change) ---
-SYNTEL_EXPERTISE = """
-Syntel specializes in:
-1. IT Automation/RPA: SyntBots platform
-2. Digital Transformation: Digital One suite
-3. Cloud & Infrastructure: IT Infrastructure Management
-4. KPO/BPO: Industry-specific solutions
-"""
-
-# --- Enhanced Dynamic Search Queries (No Change) ---
-def generate_dynamic_search_queries(company_name: str, field_name: str) -> List[str]:
-    """Generate dynamic search queries based on company and field"""
-    
-    field_queries = {
-        "linkedin_url": [
-            f'"{company_name}" LinkedIn company page',
-            f'"{company_name}" LinkedIn official'
-        ],
-        "company_website_url": [
-            f'"{company_name}" official website',
-            f'"{company_name}" company website'
-        ],
-        "industry_category": [
-            f'"{company_name}" industry business sector',
-            f'"{company_name}" type of business'
-        ],
-        "employee_count_linkedin": [
-            f'"{company_name}" employee count LinkedIn',
-            f'"{company_name}" number of employees'
-        ],
-        "headquarters_location": [
-            f'"{company_name}" headquarters location address',
-            f'"{company_name}" corporate headquarters address'
-        ],
-        "revenue_source": [
-            f'"{company_name}" revenue USD dollars financial results',
-            f'"{company_name}" annual revenue income statement',
-            f'"{company_name}" financial results revenue'
-        ],
-        "branch_network_count": [
-            f'"{company_name}" branch network facilities locations count',
-            f'"{company_name}" offices warehouses locations'
-        ],
-        "expansion_news_12mo": [
-            f'"{company_name}" expansion 2024 2025 new facilities',
-            f'"{company_name}" growth expansion news latest'
-        ],
-        "digital_transformation_initiatives": [
-            f'"{company_name}" digital transformation IT initiatives',
-            f'"{company_name}" technology modernization projects'
-        ],
-        "it_leadership_change": [
-            f'"{company_name}" CIO CTO IT leadership',
-            f'"{company_name}" chief information officer technology'
-        ],
-        "existing_network_vendors": [
-            f'"{company_name}" technology vendors Cisco VMware SAP Oracle',
-            f'"{company_name}" IT infrastructure vendors partners'
-        ],
-        "wifi_lan_tender_found": [
-            f'"{company_name}" WiFi LAN tender network upgrade',
-            f'"{company_name}" network infrastructure project'
-        ],
-        "iot_automation_edge_integration": [
-            f'"{company_name}" IoT automation robotics implementation',
-            f'"{company_name}" smart technology implementation'
-        ],
-        "cloud_adoption_gcc_setup": [
-            f'"{company_name}" cloud adoption AWS Azure GCC',
-            f'"{company_name}" cloud migration strategy'
-        ],
-        "physical_infrastructure_signals": [
-            f'"{company_name}" new construction facility expansion',
-            f'"{company_name}" infrastructure development projects'
-        ],
-        "it_infra_budget_capex": [
-            f'"{company_name}" IT budget capex investment technology spending',
-            f'"{company_name}" technology investment budget'
-        ]
-    }
-    
-    return field_queries.get(field_name, [f'"{company_name}" {field_name}'])
-
-# --- Enhanced Search with Multiple Queries (No Change) ---
-def dynamic_search_for_field(company_name: str, field_name: str) -> List[Dict]:
-    """Dynamic search for specific field information with multiple query attempts"""
-    queries = generate_dynamic_search_queries(company_name, field_name)
-    all_results = []
-    
-    for query in queries[:3]:
-        try:
-            time.sleep(1.2)
-            results = search_tool.invoke({"query": query, "max_results": 3})
-            
-            if isinstance(results, str):
-                continue
-            elif isinstance(results, list):
-                for result in results:
-                    if isinstance(result, dict):
-                        content = result.get('content', '') or result.get('snippet', '')
-                        if len(content) > 50:
-                            all_results.append({
-                                "title": result.get('title', ''),
-                                "content": content[:800],  # Increased context
-                                "url": result.get('url', ''),
-                                "field": field_name,
-                                "query": query
-                            })
-            elif isinstance(results, dict):
-                content = results.get('content', '') or results.get('snippet', '')
-                if len(content) > 50:
-                    all_results.append({
-                        "title": results.get('title', ''),
-                        "content": content[:800],
-                        "url": results.get('url', ''),
-                        "field": field_name,
-                        "query": query
-                    })
-                    
-        except Exception as e:
-            continue
-    
-    return all_results
-
-# --- URL Cleaning Functions (No Change) ---
-def clean_and_format_url(url: str) -> str:
-    """Clean and format URLs"""
-    if not url or url == "N/A":
-        return "N/A"
-    
-    if url.startswith('//'):
-        url = 'https:' + url
-    elif url.startswith('http://') and '//' in url[7:]:
-        url = url.replace('http://', 'http://').replace('//', '/')
-    elif url.startswith('https://') and '//' in url[8:]:
-        url = url.replace('https://', 'https://').replace('//', '/')
-    
-    return url
-
-# --- CRITICAL MODIFICATION: Enhanced Extraction Prompts for Single Fact ---
+# --- Enhanced Extraction Prompts (Headquarters Modified) ---
 def get_detailed_extraction_prompt(company_name: str, field_name: str, research_context: str) -> str:
     """Get detailed extraction prompts for each field with strict single-fact requirements"""
     
@@ -216,17 +77,18 @@ def get_detailed_extraction_prompt(company_name: str, field_name: str, research_
         """,
         
         "headquarters_location": f"""
-        Extract ONLY the full, complete headquarters address for {company_name}, including the country.
+        Analyze all sources and identify the single, **official corporate headquarters** for {company_name}.
+        Extract ONLY the **City, State/Province, and Country** of the headquarters.
         
         RESEARCH DATA:
         {research_context}
         
         REQUIREMENTS:
-        - Output the complete official address as ONE single string (e.g., '123 Tech Park Rd, Dallas, TX, USA').
+        - Output the location as ONE single concise string (e.g., 'Bengaluru, Karnataka, India' or 'Dallas, Texas, USA').
         - Start directly with the extracted data.
         
-        EXTRACTED HEADQUARTERS ADDRESS:
-        """,
+        EXTRACTED HEADQUARTERS LOCATION:
+        """, # <<< MODIFIED HERE
         
         "revenue_source": f"""
         Extract ONLY the latest and most relevant annual or quarterly revenue figure for {company_name}. Convert the final number to USD (with period) and provide ONE concise fact.
@@ -437,23 +299,14 @@ def dynamic_extract_field_with_sources(company_name: str, field_name: str, searc
             len(response) < 5):
             return "N/A"
         
-        # --- CRITICAL MODIFICATION: Expanded Aggressive Cleaning ---
-        # Added regex to handle multiple lines and list artifacts that the LLM may still output
+        # --- Aggressive Cleaning ---
         clean_up_phrases = [
             r'^\s*Based on the provided research data,.*:',
             r'^\s*Here is the extracted information:',
-            r'^\s*The key information is:',
             r'^\s*Extracted information:',
-            r'^\s*The relevant data is:',
             r'^\s*The headquarters address for [A-Za-z\s]+ is:',
-            r'^\s*Annual Revenue:',
-            r'^\s*Key Financial Facts:',
-            r'^\s*New facilities:',
-            r'^\s*Geographic expansions:',
-            r'^\s*[A-Za-z\s]+ has:',
-            r'^\s*The single best-fit, primary industry category is:', # Specific prompt follow-up
-            r'^\s*The most definitive employee count is:', # Specific prompt follow-up
-            r'^\s*The latest revenue figure is:', # Specific prompt follow-up
+            r'^\s*The official corporate headquarters is located at:',
+            r'^\s*The official corporate headquarters is:',
             r'^\s*\*\s*', 
             r'^\s*-\s*', 
             r'^\s*\d+\.\s*', 
@@ -462,16 +315,26 @@ def dynamic_extract_field_with_sources(company_name: str, field_name: str, searc
         for phrase in clean_up_phrases:
             response = re.sub(phrase, '', response, flags=re.IGNORECASE | re.DOTALL).strip()
 
-        # Final Cleaning
+        # --- CRITICAL HEADQUARTERS POST-PROCESSING ---
+        if field_name == "headquarters_location" and response != "N/A":
+            # Strip out street/zip details if they remain, keeping only location and country
+            # This is a fallback if the LLM ignores the prompt
+            response_parts = response.split(',')
+            # Keep the last 3 parts (City, State/Province, Country) and join them
+            if len(response_parts) > 3:
+                response = ", ".join(response_parts[-3:]).strip()
+            response = re.sub(r'\s+', ' ', response).strip()
+            return response.replace("India India", "India") # Clean up potential duplication
+
+        # Final Cleaning for all other fields
         response = re.sub(r'https?://\S+', '', response)  # Remove stray URLs
-        response = re.sub(r'\n+', ' ', response).strip() # Replace all newlines with a single space
-        response = re.sub(r'\s+', ' ', response) # Consolidate multiple spaces
-        response = response.replace("**", "").replace("*", "") # Remove bolding/emphasis
+        response = re.sub(r'\n+', ' ', response).strip() 
+        response = re.sub(r'\s+', ' ', response) 
+        response = response.replace("**", "").replace("*", "") 
         
         # Add sources for all fields except the basic ones
         if field_name not in ["linkedin_url", "company_website_url"]:
             if unique_urls and response != "N/A":
-                # Only include sources if data is present and non-basic
                 source_text = f" [Sources: {', '.join(unique_urls[:2])}]" if len(unique_urls) > 1 else f" [Source: {unique_urls[0]}]"
                 response += source_text
         
@@ -480,8 +343,59 @@ def dynamic_extract_field_with_sources(company_name: str, field_name: str, searc
     except Exception as e:
         return "N/A"
 
-# --- Relevance Analysis and UI (No Major Change) ---
+# --- Main Research Function and UI (No Change) ---
 
+def dynamic_research_company_intelligence(company_name: str) -> Dict[str, Any]:
+    """Main function to conduct comprehensive company research"""
+    
+    company_data = {}
+    all_search_results = []
+    
+    # Research each field with enhanced coverage
+    total_fields = len(REQUIRED_FIELDS) - 2
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    for i, field in enumerate(REQUIRED_FIELDS[:-2]):
+        progress = (i / total_fields) * 80
+        progress_bar.progress(int(progress))
+        status_text.info(f"🔍 Researching {field.replace('_', ' ').title()} for {company_name}...")
+        
+        try:
+            # Enhanced search with multiple queries
+            search_results = dynamic_search_for_field(company_name, field)
+            all_search_results.extend(search_results)
+            
+            # Comprehensive extraction
+            field_data = dynamic_extract_field_with_sources(company_name, field, search_results)
+            company_data[field] = field_data
+            
+            time.sleep(1.2)
+            
+        except Exception as e:
+            company_data[field] = "N/A"
+            continue
+    
+    # Generate comprehensive relevance analysis
+    status_text.info("🤔 Conducting strategic relevance analysis...")
+    progress_bar.progress(90)
+    
+    try:
+        relevance_bullets, intent_score = generate_dynamic_relevance_analysis(
+            company_data, company_name, all_search_results
+        )
+        company_data["why_relevant_to_syntel_bullets"] = relevance_bullets
+        company_data["intent_scoring_level"] = intent_score
+    except Exception as e:
+        company_data["why_relevant_to_syntel_bullets"] = "• Comprehensive analysis in progress based on company growth and technology initiatives"
+        company_data["intent_scoring_level"] = "Medium"
+    
+    progress_bar.progress(100)
+    status_text.success("✅ Comprehensive research complete!")
+    
+    return company_data
+
+# --- Relevance Analysis and Display Functions (No Change) ---
 def generate_dynamic_relevance_analysis(company_data: Dict, company_name: str, all_search_results: List[Dict]) -> tuple:
     """Generate comprehensive relevance analysis"""
     
@@ -565,7 +479,6 @@ def generate_dynamic_relevance_analysis(company_data: Dict, company_name: str, a
         
         # Ensure we have 3 quality bullets
         while len(bullets) < 3:
-            # Final fallback bullet (cleaner)
             bullets.append(f"• Potential IT service opportunity based on company growth and operational strategy.")
         
         # Clean bullets
@@ -579,64 +492,11 @@ def generate_dynamic_relevance_analysis(company_data: Dict, company_name: str, a
         return formatted_bullets, score
         
     except Exception as e:
-        # Finalized fallback for complete failure
         fallback_bullets = """• IT infrastructure modernization alignment due to expansion signals.
 • Opportunity for Digital Transformation based on technology adoption.
 • Process optimization and automation potential aligns with Syntel expertise."""
         return fallback_bullets, "Medium"
 
-# --- Main Research Function ---
-def dynamic_research_company_intelligence(company_name: str) -> Dict[str, Any]:
-    """Main function to conduct comprehensive company research"""
-    
-    company_data = {}
-    all_search_results = []
-    
-    # Research each field with enhanced coverage
-    total_fields = len(REQUIRED_FIELDS) - 2
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-    
-    for i, field in enumerate(REQUIRED_FIELDS[:-2]):
-        progress = (i / total_fields) * 80
-        progress_bar.progress(int(progress))
-        status_text.info(f"🔍 Researching {field.replace('_', ' ').title()} for {company_name}...")
-        
-        try:
-            # Enhanced search with multiple queries
-            search_results = dynamic_search_for_field(company_name, field)
-            all_search_results.extend(search_results)
-            
-            # Comprehensive extraction
-            field_data = dynamic_extract_field_with_sources(company_name, field, search_results)
-            company_data[field] = field_data
-            
-            time.sleep(1.2)
-            
-        except Exception as e:
-            company_data[field] = "N/A"
-            continue
-    
-    # Generate comprehensive relevance analysis
-    status_text.info("🤔 Conducting strategic relevance analysis...")
-    progress_bar.progress(90)
-    
-    try:
-        relevance_bullets, intent_score = generate_dynamic_relevance_analysis(
-            company_data, company_name, all_search_results
-        )
-        company_data["why_relevant_to_syntel_bullets"] = relevance_bullets
-        company_data["intent_scoring_level"] = intent_score
-    except Exception as e:
-        company_data["why_relevant_to_syntel_bullets"] = "• Comprehensive analysis in progress based on company growth and technology initiatives"
-        company_data["intent_scoring_level"] = "Medium"
-    
-    progress_bar.progress(100)
-    status_text.success("✅ Comprehensive research complete!")
-    
-    return company_data
-
-# --- Display Functions ---
 def format_concise_display_with_sources(company_input: str, data_dict: dict) -> pd.DataFrame:
     """Transform data into clean, professional display format"""
     
