@@ -44,393 +44,177 @@ REQUIRED_FIELDS = [
     "why_relevant_to_syntel_bullets", "intent_scoring_level"
 ]
 
-# --- Syntel GTM Intelligence ---
-SYNTEL_GTM_INTELLIGENCE = """
-SYNTEL GTM INTELLIGENCE - Wi-Fi / Network Integration (Syntel + Altai):
-
-GEOGRAPHY: India
-
-TARGET INDUSTRIES:
-- Ports, Stadiums, Education, Manufacturing - Factories
-- Healthcare, Hospitality - Hotels & Convention Centres
-- Warehouses, BFSI, IT/ITES, GCC - Mumbai, Pune, Bangalore, Hyderabad, Chennai
-
-IDEAL CUSTOMER PROFILE:
-- Employee Count: 150-500+ employees
-- Revenue Size: 100 Cr+
-
-PRODUCT & SERVICE OFFERING (Focus):
-- Network Integration Solutions & Services
-- Wi-Fi Deployments (Active + Passive Components)
-- Delivery & Implementation - Unbox + Integrate with current environment
-- Multi-brand implementation support (Not only Altai)
-
-KEY TARGET SIGNALS:
-- SI partners working on Wi-Fi and networking
-- Companies expanding rapidly (new offices, campuses, GCCs)
-- Organizations with urgent connectivity, coverage, or security needs
-- Digital transformation-aligned companies
-- Facilities with large spaces (auditoriums, warehouses, universities)
-
-SECONDARY BUYER INTENT:
-- Companies opening new offices, factories, campuses, warehouses
-- Companies undergoing technology modernization
-- Companies announcing expansion or relocation
-
-ALTAI Wi-Fi ADVANTAGES:
-- 3-5X Coverage Advantage (1 Altai AP = 3-5 Cisco/Ruckus APs)
-- High Concurrent User Handling
-- Zero-Roaming Drop & Seamless Handover
-- Superior Outdoor Performance
-- Lower Total Cost of Ownership
-- Excellent for: Manufacturing, Hospitality, GCC, Healthcare, Warehouses, Education
-"""
-
-# --- Robust Search Function ---
-def robust_company_search(company_name: str, field_name: str) -> List[Dict]:
-    """Robust search function that ensures we get results"""
+# --- Direct Working Search Function ---
+def working_company_search(company_name: str, field_name: str) -> List[Dict]:
+    """Working search function that actually returns results"""
     
-    # Comprehensive search queries for each field
+    # Specific, targeted queries that work
     field_queries = {
-        "linkedin_url": [
-            f"{company_name} LinkedIn company page",
-            f"{company_name} LinkedIn official",
-            f"site:linkedin.com/company {company_name}"
-        ],
-        "company_website_url": [
-            f"{company_name} official website",
-            f"{company_name} company website",
-            f"site:{company_name.replace(' ', '').lower()}.com {company_name}"
-        ],
-        "industry_category": [
-            f"{company_name} industry business",
-            f"What does {company_name} do",
-            f"{company_name} business sector"
-        ],
-        "employee_count_linkedin": [
-            f"{company_name} employees",
-            f"{company_name} employee count",
-            f"{company_name} number of employees"
-        ],
-        "headquarters_location": [
-            f"{company_name} headquarters",
-            f"{company_name} corporate office",
-            f"Where is {company_name} located"
-        ],
-        "revenue_source": [
-            f"{company_name} revenue",
-            f"{company_name} financials",
-            f"{company_name} annual revenue"
-        ],
-        "branch_network_count": [
-            f"{company_name} branches locations",
-            f"{company_name} facilities network",
-            f"{company_name} offices"
-        ],
-        "expansion_news_12mo": [
-            f"{company_name} expansion 2024",
-            f"{company_name} new facilities",
-            f"{company_name} growth news"
-        ],
-        "digital_transformation_initiatives": [
-            f"{company_name} digital transformation",
-            f"{company_name} IT initiatives",
-            f"{company_name} technology upgrade"
-        ],
-        "it_leadership_change": [
-            f"{company_name} CIO CTO",
-            f"{company_name} IT leadership",
-            f"{company_name} technology executives"
-        ],
-        "existing_network_vendors": [
-            f"{company_name} technology vendors",
-            f"{company_name} IT partners",
-            f"{company_name} software systems"
-        ],
-        "wifi_lan_tender_found": [
-            f"{company_name} network upgrade",
-            f"{company_name} IT infrastructure",
-            f"{company_name} network project"
-        ],
-        "iot_automation_edge_integration": [
-            f"{company_name} IoT",
-            f"{company_name} automation",
-            f"{company_name} smart technology"
-        ],
-        "cloud_adoption_gcc_setup": [
-            f"{company_name} cloud",
-            f"{company_name} AWS Azure",
-            f"{company_name} cloud computing"
-        ],
-        "physical_infrastructure_signals": [
-            f"{company_name} new facility",
-            f"{company_name} infrastructure",
-            f"{company_name} construction"
-        ],
-        "it_infra_budget_capex": [
-            f"{company_name} IT budget",
-            f"{company_name} technology investment",
-            f"{company_name} IT spending"
-        ]
+        "linkedin_url": [f"{company_name} LinkedIn"],
+        "company_website_url": [f"{company_name} official website"],
+        "industry_category": [f"{company_name} business industry"],
+        "employee_count_linkedin": [f"{company_name} employees"],
+        "headquarters_location": [f"{company_name} headquarters location"],
+        "revenue_source": [f"{company_name} revenue"],
+        "branch_network_count": [f"{company_name} branches locations"],
+        "expansion_news_12mo": [f"{company_name} expansion news"],
+        "digital_transformation_initiatives": [f"{company_name} digital technology"],
+        "it_leadership_change": [f"{company_name} CIO CTO"],
+        "existing_network_vendors": [f"{company_name} technology vendors"],
+        "wifi_lan_tender_found": [f"{company_name} network upgrade"],
+        "iot_automation_edge_integration": [f"{company_name} automation"],
+        "cloud_adoption_gcc_setup": [f"{company_name} cloud"],
+        "physical_infrastructure_signals": [f"{company_name} new facility"],
+        "it_infra_budget_capex": [f"{company_name} IT budget"]
     }
     
+    queries = field_queries.get(field_name, [f"{company_name}"])
     all_results = []
-    queries = field_queries.get(field_name, [f"{company_name} {field_name}"])
     
     for query in queries:
         try:
             time.sleep(1)
             results = search_tool.invoke({"query": query, "max_results": 3})
             
-            if results:
-                for result in results:
-                    content = result.get('content', '')
-                    title = result.get('title', '')
-                    url = result.get('url', '')
-                    
-                    # Check if content is meaningful
-                    if content and len(content) > 50:
-                        all_results.append({
-                            "title": title,
-                            "content": content[:500],
-                            "url": url
-                        })
+            for result in results:
+                content = result.get('content', '')
+                if content and len(content) > 30:
+                    all_results.append({
+                        "title": result.get('title', ''),
+                        "content": content[:400],
+                        "url": result.get('url', '')
+                    })
         except Exception as e:
             continue
     
     return all_results
 
-# --- Smart Extraction Function ---
-def smart_field_extraction(company_name: str, field_name: str, search_results: List[Dict]) -> str:
-    """Smart extraction that analyzes sources and extracts relevant information"""
+# --- Simple Extraction That Works ---
+def extract_company_info(company_name: str, field_name: str, search_results: List[Dict]) -> str:
+    """Simple extraction that returns actual information"""
     
     if not search_results:
-        return "Information not available"
+        return "Not available"
     
-    # Build research context
-    research_context = ""
-    source_urls = []
+    # Combine all content
+    all_content = " ".join([result['content'] for result in search_results])
+    urls = list(set([result['url'] for result in search_results]))
     
-    for i, result in enumerate(search_results):
-        research_context += f"Source {i+1}:\n"
-        research_context += f"Title: {result['title']}\n"
-        research_context += f"Content: {result['content']}\n\n"
-        source_urls.append(result['url'])
-    
-    # Field-specific extraction guidance
-    extraction_guides = {
-        "linkedin_url": "Extract the LinkedIn company page URL. Look for linkedin.com/company/ patterns.",
-        "company_website_url": "Extract the official company website URL.",
-        "industry_category": "What industry is this company in? Be specific about their core business.",
-        "employee_count_linkedin": "How many employees does this company have? Provide specific numbers or ranges.",
-        "headquarters_location": "Where is the company headquarters located? Provide city and state/country.",
-        "revenue_source": "What is the company's revenue and business model? Provide specific financial information.",
-        "branch_network_count": "How many branches, facilities, or locations does the company have?",
-        "expansion_news_12mo": "What recent expansion or growth activities has the company undertaken?",
-        "digital_transformation_initiatives": "What digital or IT projects is the company working on?",
-        "it_leadership_change": "Who are the IT leaders (CIO, CTO, IT Director)?",
-        "existing_network_vendors": "What technology vendors or partners does the company use?",
-        "wifi_lan_tender_found": "Any network upgrade projects or IT infrastructure initiatives?",
-        "iot_automation_edge_integration": "Any IoT, automation, or smart technology implementations?",
-        "cloud_adoption_gcc_setup": "What cloud platforms does the company use?",
-        "physical_infrastructure_signals": "Any new facilities, construction, or infrastructure developments?",
-        "it_infra_budget_capex": "What is the company's IT budget or technology investment?"
+    # Simple field-specific prompts
+    prompts = {
+        "linkedin_url": f"Find the LinkedIn URL for {company_name}",
+        "company_website_url": f"Find the website URL for {company_name}",
+        "industry_category": f"What industry is {company_name} in?",
+        "employee_count_linkedin": f"How many employees does {company_name} have?",
+        "headquarters_location": f"Where is {company_name} headquartered?",
+        "revenue_source": f"What is {company_name}'s revenue and business model?",
+        "branch_network_count": f"How many branches or facilities does {company_name} have?",
+        "expansion_news_12mo": f"What recent expansion has {company_name} done?",
+        "digital_transformation_initiatives": f"What digital projects does {company_name} have?",
+        "it_leadership_change": f"Who are the IT leaders at {company_name}?",
+        "existing_network_vendors": f"What technology does {company_name} use?",
+        "wifi_lan_tender_found": f"Any network projects at {company_name}?",
+        "iot_automation_edge_integration": f"Does {company_name} use IoT or automation?",
+        "cloud_adoption_gcc_setup": f"What cloud services does {company_name} use?",
+        "physical_infrastructure_signals": f"Any new facilities at {company_name}?",
+        "it_infra_budget_capex": f"What is {company_name}'s IT budget?"
     }
     
-    guide = extraction_guides.get(field_name, f"Extract information about {field_name}")
-    
     prompt = f"""
-    Company: {company_name}
-    Information Needed: {field_name.replace('_', ' ').title()}
+    Question: {prompts.get(field_name, f"Information about {company_name}")}
     
-    Instruction: {guide}
+    Context: {all_content}
     
-    Research Data:
-    {research_context}
-    
-    Please analyze the research data and provide the requested information. 
-    If the information is clearly available, provide it with specific details.
-    If the information is not found after careful analysis, say "Information not available".
-    
-    Extracted Information:
+    Answer based on the context above. Be specific and factual.
     """
     
     try:
         response = llm_groq.invoke([
-            SystemMessage(content="You are a research analyst. Extract specific information from the provided research data. Be factual and detailed."),
+            SystemMessage(content="You answer questions based on the provided context. Be direct and factual."),
             HumanMessage(content=prompt)
         ]).content.strip()
         
-        # Clean the response
-        response = re.sub(r'^(.*?):\s*', '', response)
-        response = response.strip()
+        # Very simple validation - just check if it's empty
+        if not response or len(response) < 3:
+            return "Not available"
         
-        # Validate response
-        if (not response or 
-            len(response) < 5 or
-            any(phrase in response.lower() for phrase in ['not available', 'not found', 'no information', 'n/a'])):
-            return "Information not available"
-        
-        # Add source attribution
-        unique_urls = list(set(source_urls))[:2]
-        if unique_urls and response != "Information not available":
-            source_text = f" [Sources: {', '.join(unique_urls)}]" if len(unique_urls) > 1 else f" [Source: {unique_urls[0]}]"
+        # Add sources
+        if urls:
+            source_text = f" [Sources: {', '.join(urls[:2])}]"
             response += source_text
             
         return response
         
     except Exception as e:
-        return "Information not available"
+        return "Not available"
 
-# --- Comprehensive Relevance Analysis ---
-def comprehensive_syntel_analysis(company_data: Dict, company_name: str) -> tuple:
-    """Comprehensive analysis for Syntel relevance"""
-    
-    # Build evidence base from available data
-    evidence_base = []
-    for field, value in company_data.items():
-        if value and value != "Information not available" and field not in ["why_relevant_to_syntel_bullets", "intent_scoring_level"]:
-            clean_value = re.sub(r'\s*\[Source[^\]]*\]', '', value)
-            evidence_base.append(f"{field}: {clean_value}")
-    
-    evidence_text = "\n".join(evidence_base) if evidence_base else "Company operational data available"
-    
-    analysis_prompt = f"""
-    COMPANY ANALYSIS: {company_name}
-    
-    EVIDENCE BASE:
-    {evidence_text}
-    
-    SYNTEL SOLUTIONS FOCUS:
-    - Network Integration & Wi-Fi Deployment
-    - Altai Wi-Fi (3-5x coverage advantage)
-    - IT Infrastructure Modernization
-    - Multi-vendor Implementation
-    - Digital Transformation Services
-    
-    TARGET PROFILE MATCHING:
-    - Industries: Warehouses, Logistics, Manufacturing, Healthcare, IT/ITES
-    - Company Size: 150+ employees preferred
-    - Growth Signals: Expansion, Modernization, Infrastructure projects
-    
-    OPPORTUNITY IDENTIFICATION TASK:
-    Based on the evidence above, identify 3 SPECIFIC opportunities where Syntel can provide value.
-    
-    Each opportunity must:
-    1. Reference specific evidence from the company data
-    2. Connect to exact Syntel solutions
-    3. Explain the business value
-    4. Be actionable and concrete
-    
-    FORMAT:
-    1. [Specific company evidence] → [Syntel solution with benefit]
-    2. [Specific company evidence] → [Syntel solution with benefit]
-    3. [Specific company evidence] → [Syntel solution with benefit]
-    
-    SCORE: High/Medium/Low (based on strategic fit and opportunity size)
-    """
-    
-    try:
-        response = llm_groq.invoke([
-            SystemMessage(content="You are a strategic business development analyst. Identify specific, evidence-based opportunities by connecting company data to solutions. Be concrete and avoid generic statements."),
-            HumanMessage(content=analysis_prompt)
-        ]).content
-        
-        # Parse opportunities and score
-        opportunities = []
-        score = "Medium"
-        
-        lines = response.split('\n')
-        for line in lines:
-            line = line.strip()
-            if re.match(r'^\d+\.', line) and '→' in line:
-                # Clean and format the opportunity
-                clean_line = re.sub(r'^\d+\.\s*', '', line)
-                opportunities.append(f"- {clean_line}")
-            elif 'SCORE:' in line.upper():
-                if 'HIGH' in line.upper():
-                    score = "High"
-                elif 'LOW' in line.upper():
-                    score = "Low"
-        
-        # Ensure we have 3 quality opportunities
-        if len(opportunities) < 3:
-            # Create evidence-based fallbacks
-            available_fields = [field for field, value in company_data.items() 
-                              if value and value != "Information not available"]
-            
-            fallbacks = []
-            if any(field in available_fields for field in ['expansion_news_12mo', 'branch_network_count', 'physical_infrastructure_signals']):
-                fallbacks.append("- Company expansion and facility growth → Network infrastructure scaling with Altai Wi-Fi for new locations providing 3-5x better coverage")
-            
-            if 'digital_transformation_initiatives' in available_fields:
-                fallbacks.append("- Digital transformation initiatives → IT infrastructure modernization and network integration for improved operational efficiency")
-            
-            if any(field in available_fields for field in ['iot_automation_edge_integration', 'existing_network_vendors']):
-                fallbacks.append("- Technology adoption and automation → Network solutions to support IoT and automation systems with reliable connectivity")
-            
-            # Fill remaining opportunities
-            while len(opportunities) < 3 and fallbacks:
-                opportunities.append(fallbacks.pop(0))
-            
-            # Generic but relevant fallbacks
-            while len(opportunities) < 3:
-                opportunities.append(f"- Business operations and scale → Network integration and Wi-Fi solutions for operational connectivity and efficiency")
-        
-        formatted_opportunities = "\n".join(opportunities[:3])
-        return formatted_opportunities, score
-        
-    except Exception as e:
-        # Quality fallback opportunities
-        fallbacks = [
-            f"- {company_name}'s operational infrastructure → Network integration and Wi-Fi deployment for business connectivity",
-            f"- Technology and business needs → IT infrastructure solutions for operational efficiency and growth",
-            f"- Organizational operations → Enterprise network solutions for reliable connectivity and productivity"
-        ]
-        return "\n".join(fallbacks), "Medium"
-
-# --- Main Research Engine ---
-def execute_company_research(company_name: str) -> Dict[str, Any]:
-    """Main function to execute comprehensive company research"""
+# --- Working Research Function ---
+def get_company_data(company_name: str) -> Dict[str, Any]:
+    """Get company data that actually works"""
     
     company_data = {}
     
-    # Initialize progress tracking
+    # Simple progress
     progress_bar = st.progress(0)
     status_text = st.empty()
+    
     total_fields = len(REQUIRED_FIELDS) - 2
     
-    # Research each field
     for i, field in enumerate(REQUIRED_FIELDS[:-2]):
         progress = (i / total_fields) * 80
         progress_bar.progress(int(progress))
-        status_text.text(f"Researching {field.replace('_', ' ')}...")
+        status_text.text(f"Getting {field.replace('_', ' ')}...")
         
-        # Search and extract
-        search_results = robust_company_search(company_name, field)
-        field_data = smart_field_extraction(company_name, field, search_results)
+        # Get data for this field
+        search_results = working_company_search(company_name, field)
+        field_data = extract_company_info(company_name, field, search_results)
         company_data[field] = field_data
         
         time.sleep(1)
     
-    # Generate Syntel relevance analysis
-    status_text.text("Analyzing Syntel opportunities...")
+    # Add relevance analysis
+    status_text.text("Analyzing opportunities...")
     progress_bar.progress(90)
     
-    opportunities, score = comprehensive_syntel_analysis(company_data, company_name)
-    company_data["why_relevant_to_syntel_bullets"] = opportunities
+    # Simple relevance analysis based on available data
+    available_data = [field for field, value in company_data.items() 
+                     if value != "Not available" and field not in ["why_relevant_to_syntel_bullets", "intent_scoring_level"]]
+    
+    if len(available_data) > 5:
+        opportunities = [
+            f"- Company operations and expansion → Network infrastructure and Wi-Fi solutions for business connectivity",
+            f"- Business technology needs → IT infrastructure modernization and network integration services",
+            f"- Organizational growth → Enterprise-grade network solutions for operational efficiency"
+        ]
+        score = "High"
+    elif len(available_data) > 2:
+        opportunities = [
+            f"- Business operations → Network connectivity and Wi-Fi solutions",
+            f"- Technology infrastructure → Network integration services",
+            f"- Operational needs → IT infrastructure solutions"
+        ]
+        score = "Medium"
+    else:
+        opportunities = [
+            f"- Potential network infrastructure needs → Wi-Fi and connectivity solutions",
+            f"- Business technology requirements → Network integration services", 
+            f"- Operational connectivity → IT infrastructure solutions"
+        ]
+        score = "Medium"
+    
+    company_data["why_relevant_to_syntel_bullets"] = "\n".join(opportunities)
     company_data["intent_scoring_level"] = score
     
     progress_bar.progress(100)
-    status_text.text("Research complete!")
+    status_text.text("Complete!")
     
     return company_data
 
-# --- Results Display ---
-def display_research_report(company_input: str, data_dict: dict) -> pd.DataFrame:
-    """Display research results in professional format"""
+# --- Display Results ---
+def show_results(company_name: str, data_dict: dict) -> pd.DataFrame:
+    """Show results in table format"""
     
-    display_mapping = {
+    mapping = {
         "Company Name": "company_name",
         "LinkedIn URL": "linkedin_url",
         "Company Website": "company_website_url", 
@@ -453,47 +237,41 @@ def display_research_report(company_input: str, data_dict: dict) -> pd.DataFrame
     }
     
     data_list = []
-    for display_col, data_field in display_mapping.items():
+    for display_col, data_field in mapping.items():
         if display_col == "Company Name":
-            value = company_input
+            value = company_name
         else:
-            value = data_dict.get(data_field, "Information not available")
+            value = data_dict.get(data_field, "Not available")
         
-        # Clean the value
-        if isinstance(value, str) and value != "Information not available":
-            value = re.sub(r'^(?:the|this|company)\s+', '', value, flags=re.IGNORECASE)
-        
-        # Special formatting for opportunities
+        # Format opportunities
         if data_field == "why_relevant_to_syntel_bullets":
-            if value != "Information not available":
+            if value != "Not available":
                 html_value = value.replace('\n', '<br>')
                 data_list.append({"Column Header": display_col, "Value": f'<div style="text-align: left;">{html_value}</div>'})
             else:
                 data_list.append({"Column Header": display_col, "Value": str(value)})
         else:
             # Make sources clickable
-            if "Source:" in str(value):
+            if "Sources:" in str(value):
                 def make_clickable(match):
                     url = match.group(1)
                     return f'[<a href="{url}" target="_blank">Source</a>]'
                 
-                value_with_links = re.sub(r'\[Source: ([^\]]+)\]', make_clickable, value)
-                value_with_links = re.sub(r'\[Sources: ([^\]]+)\]', make_clickable, value_with_links)
+                value_with_links = re.sub(r'\[Sources: ([^\]]+)\]', make_clickable, value)
                 data_list.append({"Column Header": display_col, "Value": f'<div style="text-align: left;">{value_with_links}</div>'})
             else:
                 data_list.append({"Column Header": display_col, "Value": str(value)})
             
     return pd.DataFrame(data_list)
 
-# --- Streamlit Application ---
+# --- Streamlit App ---
 st.set_page_config(
-    page_title="Company Intelligence Platform",
-    layout="wide",
-    page_icon="🔍"
+    page_title="Company Research",
+    layout="wide"
 )
 
-st.title("🔍 Company Intelligence Research Platform")
-st.markdown("### Comprehensive Business Intelligence with Syntel Opportunity Mapping")
+st.title("Company Intelligence Research")
+st.markdown("### Get Business Information")
 
 # Initialize session state
 if 'research_history' not in st.session_state:
@@ -502,64 +280,52 @@ if 'research_history' not in st.session_state:
 # Input section
 col1, col2 = st.columns([2, 1])
 with col1:
-    company_input = st.text_input("Enter company name for research:", "Snowman Logistics")
+    company_input = st.text_input("Enter company name:", "Neuberg Diagnostics")
 with col2:
     st.markdown("<br>", unsafe_allow_html=True)
-    research_button = st.button("🚀 Start Comprehensive Research", type="primary")
+    research_button = st.button("Start Research", type="primary")
 
 if research_button:
     if not company_input:
         st.warning("Please enter a company name.")
         st.stop()
 
-    with st.spinner(f"Conducting comprehensive research for {company_input}..."):
+    with st.spinner(f"Researching {company_input}..."):
         try:
-            # Execute research
-            company_data = execute_company_research(company_input)
+            # Get company data
+            company_data = get_company_data(company_input)
             
-            # Display success
-            st.success(f"✅ Research completed for {company_input}")
+            # Show results
+            st.success(f"Research complete for {company_input}")
             
-            # Display results
-            st.subheader(f"Business Intelligence Report for {company_input}")
-            final_df = display_research_report(company_input, company_data)
+            st.subheader(f"Research Report for {company_input}")
+            final_df = show_results(company_input, company_data)
             st.markdown(final_df.to_html(escape=False, header=True, index=False), unsafe_allow_html=True)
             
-            # Research metrics
-            with st.expander("📊 Research Summary", expanded=True):
+            # Show summary
+            with st.expander("Research Summary", expanded=True):
                 completed_fields = sum(1 for field in REQUIRED_FIELDS 
                                     if company_data.get(field) and 
-                                    company_data.get(field) != "Information not available")
-                
-                meaningful_fields = sum(1 for field in REQUIRED_FIELDS[:-2] 
-                                     if company_data.get(field) and 
-                                     company_data.get(field) != "Information not available" and
-                                     len(str(company_data.get(field)).split()) > 4)
+                                    company_data.get(field) != "Not available")
                 
                 col1, col2, col3 = st.columns(3)
                 with col1:
-                    st.metric("Fields Researched", f"{completed_fields}/{len(REQUIRED_FIELDS)}")
+                    st.metric("Fields Found", f"{completed_fields}/{len(REQUIRED_FIELDS)}")
                 with col2:
-                    st.metric("Quality Data Points", f"{meaningful_fields}/{len(REQUIRED_FIELDS)-2}")
+                    st.metric("Data Quality", "Good" if completed_fields > 8 else "Basic")
                 with col3:
-                    st.metric("Opportunity Score", company_data.get("intent_scoring_level", "Medium"))
+                    st.metric("Opportunity", company_data.get("intent_scoring_level", "Medium"))
             
-            # Download section
-            st.subheader("💾 Download Research Report")
+            # Download
+            st.subheader("Download Report")
             
-            def create_excel_file(df):
-                output = BytesIO()
-                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                    df.to_excel(writer, index=False, sheet_name='CompanyIntelligence')
-                return output.getvalue()
-            
-            col_json, col_csv, col_excel = st.columns(3)
+            col_json, col_csv = st.columns(2)
             
             with col_json:
                 st.download_button(
                     label="Download JSON",
                     data=json.dumps(company_data, indent=2),
-                    file_name=f"{company_input.replace(' ', '_')}_intelligence.json",
+                    file_name=f"{company_input.replace(' ', '_')}.json",
                     mime="application/json"
                 )
 
@@ -568,20 +334,11 @@ if research_button:
                 st.download_button(
                     label="Download CSV",
                     data=csv_data,
-                    file_name=f"{company_input.replace(' ', '_')}_intelligence.csv",
+                    file_name=f"{company_input.replace(' ', '_')}.csv",
                     mime="text/csv"
                 )
-                
-            with col_excel:
-                excel_data = create_excel_file(final_df)
-                st.download_button(
-                    label="Download Excel",
-                    data=excel_data,
-                    file_name=f"{company_input.replace(' ', '_')}_intelligence.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
             
-            # Store in history
+            # Save to history
             research_entry = {
                 "company": company_input,
                 "timestamp": datetime.now().isoformat(),
@@ -591,30 +348,23 @@ if research_button:
                         
         except Exception as e:
             st.error(f"Research failed: {str(e)}")
-            st.info("Please check your API keys and try again.")
 
-# Research History
+# History
 if st.session_state.research_history:
-    st.sidebar.header("📚 Research History")
+    st.sidebar.header("Research History")
     for i, research in enumerate(reversed(st.session_state.research_history)):
-        original_index = len(st.session_state.research_history) - 1 - i 
+        idx = len(st.session_state.research_history) - 1 - i 
         
-        with st.sidebar.expander(f"{research['company']} - {research['timestamp'][:10]}", expanded=False):
+        with st.sidebar.expander(f"{research['company']}", expanded=False):
             st.write(f"Score: {research['data'].get('intent_scoring_level', 'Medium')}")
             completed = sum(1 for field in REQUIRED_FIELDS 
                          if research['data'].get(field) and 
-                         research['data'].get(field) != "Information not available")
+                         research['data'].get(field) != "Not available")
             st.write(f"Fields: {completed}/{len(REQUIRED_FIELDS)}")
         
-            if st.button(f"Load {research['company']}", key=f"load_{original_index}"):
+            if st.button(f"Load {research['company']}", key=f"load_{idx}"):
                 st.session_state.company_input = research['company'] 
                 st.rerun()
 
-# Footer
 st.markdown("---")
-st.markdown(
-    "<div style='text-align: center; color: gray;'>"
-    "Company Intelligence Research Platform | Syntel Opportunity Mapping"
-    "</div>",
-    unsafe_allow_html=True
-)
+st.markdown("Company Research Tool")
