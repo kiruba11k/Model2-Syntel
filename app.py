@@ -337,6 +337,7 @@ def dynamic_research_company_intelligence(company_name: str) -> Dict[str, Any]:
     return company_data
 
 # --- Enhanced Relevance Analysis Function (Focusing on Syntel's Network GTM) ---
+# --- Enhanced Relevance Analysis Function (Focusing on Syntel's Network GTM) ---
 def generate_dynamic_relevance_analysis(company_data: Dict, company_name: str, all_search_results: List[Dict]) -> tuple:
     """Generate comprehensive relevance analysis, prioritizing Network Integration and Expansion."""
     
@@ -352,40 +353,41 @@ def generate_dynamic_relevance_analysis(company_data: Dict, company_name: str, a
     source_context = f"Research sources: {', '.join(unique_urls)}" if unique_urls else "Based on comprehensive research"
     
     relevance_prompt = f"""
-    COMPANY: {company_name} (A Cold Chain Logistics/Warehouse Operator)
+    COMPANY: {company_name} 
+    Industry: {company_data.get('industry_category', 'Not specified')}
     {source_context}
     
     DETAILED COMPANY DATA:
     {context}
     
     SYNTEL CORE EXPERTISE (Network Integration & GTM Focus):
-    1. Target Industry: **Warehouses** & Logistics Hubs.
-    2. Primary Need: New **Wi-Fi / Network Integration** for expansion, coverage, and AGV/forklift roaming.
-    3. Differentiation: Altai WiFi provides **3-5x coverage, seamless roaming (Zero-Roaming Drop)**, and is ideal for large, complex warehouse spaces.
-    4. Service: End-to-end multi-brand deployment and integration support.
+    1. Target Industries: Warehouses, Manufacturing, Healthcare, Education, GCCs (all facilities with large spaces).
+    2. Primary Need: New **Wi-Fi / Network Integration** for expansion, better coverage, and seamless IoT/handheld connectivity.
+    3. Differentiation: Altai WiFi provides **3-5x coverage, seamless roaming (Zero-Roaming Drop)**, and is ideal for large, complex spaces like warehouses.
+    4. Service: End-to-end multi-brand deployment and integration support (One Partner. End-to-End Connectivity).
     
-    TASK: Analyze the company data, focusing on **Expansion News** and **Branch Network Count**. Create 3 detailed, evidence-based bullet points explaining the relevance to Syntel's Network Integration GTM strategy (Altai).
+    TASK: Analyze the DETAILED COMPANY DATA. Create 3 meaningful, evidence-based bullet points explaining the relevance to Syntel's Network Integration GTM strategy. The bullets must be *specific* to the company's data points (Expansion News, IoT, Revenue, etc.).
     
     Then provide an INTENT SCORE: High/Medium/Low based on concrete business and technology signals.
     
     High Intent Signals:
-    - New warehouse construction/expansion (especially 2025/2026 dates).
-    - Mention of IoT, Automation, or Edge Integration requiring seamless Wi-Fi.
-    - Large number of facilities/locations requiring central network management.
+    - Recent or announced expansion/new facilities (2024/2025/2026 dates).
+    - Mention of IoT, Automation, or Edge Integration.
+    - Large revenue/employee growth suggesting IT budget investment.
     
     FORMAT:
     BULLETS:
-    1. [Expansion Signal] - [Syntel's Core Offering] - [Benefit/Evidence]
-    2. [Operational Challenge] - [Syntel's Differentiation (Altai)] - [Specific Use Case]
-    3. [IT/Network Need] - [Syntel's Service Model] - [Strategic Opportunity]
+    1. [Specific Data Point from Research] - [Syntel's Core Offering] - [Calculated Opportunity]
+    2. [Operational Challenge/Technology Gap] - [Syntel's Differentiation (Altai)] - [Specific Benefit]
+    3. [Strategic IT Need] - [Syntel's Service Model] - [Strategic Opportunity]
     SCORE: High/Medium/Low
     
-    Be specific, evidence-based, and focus on actionable opportunities related to network modernization.
+    Be specific, use the facts provided, and focus on actionable network modernization opportunities.
     """
     
     try:
         response = llm_groq.invoke([
-            SystemMessage(content="You are a strategic business analyst specializing in IT services alignment. Provide detailed, evidence-based analysis focused on Network Integration and Expansion opportunities."),
+            SystemMessage(content="You are a strategic business analyst. Provide highly specific, evidence-based analysis *directly referencing* the provided company data to justify the relevance. DO NOT use generic or repetitive statements."),
             HumanMessage(content=relevance_prompt)
         ]).content
         
@@ -412,9 +414,20 @@ def generate_dynamic_relevance_analysis(company_data: Dict, company_name: str, a
                     score = "Low"
                 bullet_section = False
         
-        while len(bullets) < 3:
-            bullets.append(f"• Potential network integration opportunity based on company's focus on logistics and warehousing.")
-        
+        # Fallback for parsing failure - now more specific to GTM
+        if len(bullets) < 3:
+             fallback_bullets_list = [
+                f"• Significant expansion (e.g., {company_data.get('expansion_news_12mo', 'new facilities')}) creates immediate network rollout needs, aligning with Syntel's deployment expertise.",
+                "• As a large facility operator (Warehouses, etc.), the need for wide-area Wi-Fi coverage is high, an ideal fit for Syntel's differentiated Altai solution (3-5x coverage).",
+                f"• Technology adoption ({company_data.get('iot_automation_edge_integration', 'IoT/automation')}) requires seamless, high-speed roaming, which Syntel can deliver via network integration."
+             ]
+             bullets = fallback_bullets_list
+             if "new facilities" not in bullets[0] and "IoT/automation" not in bullets[2]:
+                 score = "Medium" # Lower the score if key data points weren't found/used
+             else:
+                 score = "High"
+
+        # Clean bullets
         cleaned_bullets = []
         for bullet in bullets[:3]:
             clean_bullet = re.sub(r'\*\*|\*|__|_', '', bullet)
@@ -425,10 +438,11 @@ def generate_dynamic_relevance_analysis(company_data: Dict, company_name: str, a
         return formatted_bullets, score
         
     except Exception:
-        fallback_bullets = """• High relevance as a logistics/warehouse player (Syntel Target Industry).
-• New facility expansions (Pune, Kolkata, Krishnapatnam) create immediate need for new network integration (GTM Focus).
-• Opportunity to position Altai WiFi for seamless, long-range coverage across large warehouse floors for IoT/scanners."""
-        return fallback_bullets, "High" # Default to high intent given expansion signals
+        # Final safety net fallback
+        fallback_bullets = """• High relevance as a target industry (logistics/warehouse operator).
+• Facility expansion signals a strong need for network deployment and integration services (GTM Focus).
+• Opportunity to deploy differentiated Wi-Fi technology to support large-scale automation/IoT initiatives."""
+        return fallback_bullets, "Medium"
 
 def format_concise_display_with_sources(company_input: str, data_dict: dict) -> pd.DataFrame:
     """Transform data into clean, professional display format (Unchanged)"""
