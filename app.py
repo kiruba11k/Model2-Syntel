@@ -288,7 +288,7 @@ def research_concise_intelligence_with_sources(company_name: str) -> Dict[str, A
         time.sleep(1)
     
     # Generate concise relevance analysis with source context
-    st.session_state.status_text.info("🎯 Analyzing Syntel relevance...")
+    st.session_state.status_text.info(" Analyzing Syntel relevance...")
     st.session_state.progress_bar.progress(90)
     
     relevance_bullets, intent_score = generate_concise_relevance_with_sources(
@@ -362,11 +362,11 @@ def format_concise_display_with_sources(company_input: str, data_dict: dict) -> 
 st.set_page_config(
     page_title="Syntel BI Agent (Concise + Sources)",
     layout="wide",
-    page_icon="🏢"
+    page_icon=""
 )
 
-st.title("🏢 Syntel Company Data AI Agent")
-st.markdown("### 🎯 Concise Format with Source URLs")
+st.title("Syntel Company Data AI Agent")
+st.markdown("###  Concise Format with Source URLs")
 
 # Initialize session state
 if 'research_history' not in st.session_state:
@@ -375,14 +375,14 @@ if 'company_input' not in st.session_state:
     st.session_state.company_input = "Snowman Logistics"
 
 # Display enhanced approach
-with st.expander("🔧 Concise Research with Source URLs", expanded=True):
+with st.expander("Concise Research with Source URLs", expanded=True):
     st.markdown("""
-    **🎯 Short & Crisp Outputs WITH SOURCE URLs:**
+    ** Short & Crisp Outputs WITH SOURCE URLs:**
     
-    - **📋 Concise Format**: Brief, to-the-point information
-    - **🔗 Source URLs**: Every field includes clickable source links
-    - **🎯 Key Facts Only**: No verbose explanations
-    - **📊 Standardized Format**: Consistent output style
+    - ** Concise Format**: Brief, to-the-point information
+    - ** Source URLs**: Every field includes clickable source links
+    - ** Key Facts Only**: No verbose explanations
+    - ** Standardized Format**: Consistent output style
     
     **Output Style:**
     - Industry: "Warehouse / Cold-chain [Source: url]" 
@@ -397,7 +397,7 @@ with col1:
     company_input = st.text_input("Enter the company name to research:", st.session_state.company_input)
 with col2:
     with st.form("research_form"):
-        submitted = st.form_submit_button("🚀 Start Research with Sources", type="primary")
+        submitted = st.form_submit_button(" Start Research with Sources", type="primary")
 
 if submitted:
     st.session_state.company_input = company_input
@@ -411,7 +411,7 @@ if submitted:
     st.session_state.status_text = st.empty()
     
     # Show initial status
-    st.session_state.status_text.info("🚀 Starting research with source URLs...")
+    st.session_state.status_text.info(" Starting research with source URLs...")
     st.session_state.progress_bar.progress(5)
     
     with st.spinner(f"**Researching {company_input} with source URLs...**"):
@@ -421,7 +421,7 @@ if submitted:
             
             # Update final progress
             st.session_state.progress_bar.progress(100)
-            st.session_state.status_text.success(f"🎉 Research Complete for {company_input}!")
+            st.session_state.status_text.success(f" Research Complete for {company_input}!")
             
             # Store in history
             research_entry = {
@@ -433,15 +433,15 @@ if submitted:
             
             # Display results
             st.balloons()
-            st.success("✅ All fields researched with source URLs!")
+            st.success(" All fields researched with source URLs!")
             
             # Display final results
-            st.subheader(f"📊 Business Intelligence Report for {company_input}")
+            st.subheader(f"Business Intelligence Report for {company_input}")
             final_df = format_concise_display_with_sources(company_input, company_data)
             st.markdown(final_df.to_html(escape=False, header=True, index=False), unsafe_allow_html=True)
             
             # Show completion metrics
-            with st.expander("📈 Research Summary", expanded=True):
+            with st.expander("Research Summary", expanded=True):
                 completed_fields = sum(1 for field in REQUIRED_FIELDS 
                                     if company_data.get(field) and 
                                     company_data.get(field) != "N/A")
@@ -460,7 +460,7 @@ if submitted:
                     st.metric("Intent Score", company_data.get("intent_scoring_level", "Medium"))
             
             # Download options
-            st.subheader("💾 Download Report")
+            st.subheader(" Download Report")
             
             def to_excel(df):
                 output = BytesIO()
@@ -503,18 +503,18 @@ if submitted:
 
 # Research History
 if st.session_state.research_history:
-    st.sidebar.header("📚 Research History")
+    st.sidebar.header(" Research History")
     for i, research in enumerate(reversed(st.session_state.research_history)):
         original_index = len(st.session_state.research_history) - 1 - i 
         
         with st.sidebar.expander(f"**{research['company']}** - {research['timestamp'][:10]}", expanded=False):
-            st.write(f"🎯 Intent Score: {research['data'].get('intent_scoring_level', 'N/A')}")
+            st.write(f" Intent Score: {research['data'].get('intent_scoring_level', 'N/A')}")
             completed_fields = sum(1 for field in REQUIRED_FIELDS 
                                 if research['data'].get(field) and 
                                 research['data'].get(field) != "N/A")
-            st.write(f"📊 Fields Completed: {completed_fields}/{len(REQUIRED_FIELDS)}")
-            
-            if st.button(f"📥 Load {research['company']}", key=f"load_{original_index}"):
+            st.write(f"Fields Completed: {completed_fields}/{len(REQUIRED_FIELDS)}")
+        
+            if st.button(f"Load {research['company']}", key=f"load_{original_index}"):
                 st.session_state.company_input = research['company'] 
                 st.rerun()
 
@@ -522,8 +522,7 @@ if st.session_state.research_history:
 st.markdown("---")
 st.markdown(
     "<div style='text-align: center; color: gray;'>"
-    "🤖 Powered by Concise Research with Source URLs | "
-    "Clickable Source Links | Verifiable Intelligence"
+    " "
     "</div>",
     unsafe_allow_html=True
 )
