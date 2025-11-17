@@ -177,7 +177,51 @@ def dynamic_search_for_field(company_name: str, field_name: str) -> List[Dict]:
     
     return all_results
 
-# --- FIXED: Dynamic Extraction with Fallback ---
+# --- FIXED: Clean URL formatting function ---
+def clean_and_format_url(url: str) -> str:
+    """Clean and format URLs to remove double slashes and make proper"""
+    if not url or url == "N/A":
+        return "N/A"
+    
+    # Remove double slashes at start but keep http(s)://
+    if url.startswith('//'):
+        url = 'https:' + url
+    elif url.startswith('http://') and '//' in url[7:]:
+        url = url.replace('http://', 'http://').replace('//', '/')
+    elif url.startswith('https://') and '//' in url[8:]:
+        url = url.replace('https://', 'https://').replace('//', '/')
+    
+    return url
+
+# --- FIXED: Clean text formatting function ---
+def clean_text_content(text: str) -> str:
+    """Clean and format text content for display"""
+    if not text or text == "N/A":
+        return "N/A"
+    
+    # Remove extra newlines and spaces
+    text = re.sub(r'\n+', '\n', text)
+    text = re.sub(r'[ ]+', ' ', text)
+    
+    # Remove extraction prefixes
+    prefixes_to_remove = [
+        "Extracted Digital/IT Transformation Initiatives for",
+        "Extract the",
+        "Revenue/Business Model Information for",
+        "IT Leadership Information for",
+        "WiFi/LAN/network upgrade information for",
+        "Extracted"
+    ]
+    
+    for prefix in prefixes_to_remove:
+        if text.startswith(prefix):
+            text = text[len(prefix):].strip()
+            if text.startswith(':'):
+                text = text[1:].strip()
+    
+    return text.strip()
+
+# --- FIXED: Dynamic Extraction with Clean Formatting ---
 def dynamic_extract_field_with_sources(company_name: str, field_name: str, search_results: List[Dict]) -> str:
     """Dynamically extract information based on actual search results"""
     
@@ -208,7 +252,7 @@ def dynamic_extract_field_with_sources(company_name: str, field_name: str, searc
         
         "industry_category": f"""
         Extract the primary industry/business category for {company_name} based on the research.
-        Be specific: 'Cold Chain Logistics', 'Warehouse Storage', 'Manufacturing', etc.
+        Be specific: 'Clinical Laboratory Testing', 'Healthcare Diagnostics', 'Medical Services', etc.
         Return 2-4 word category only.
         """,
         
@@ -245,7 +289,7 @@ def dynamic_extract_field_with_sources(company_name: str, field_name: str, searc
         "digital_transformation_initiatives": f"""
         Extract digital/IT transformation initiatives for {company_name}.
         Look for ERP, automation, digitalization, technology projects.
-        Return concise technology initiative description.
+        Return concise technology initiative description without explanatory text.
         """,
         
         "it_leadership_change": f"""
@@ -269,7 +313,7 @@ def dynamic_extract_field_with_sources(company_name: str, field_name: str, searc
         "iot_automation_edge_integration": f"""
         Extract IoT/Automation/Edge computing adoption for {company_name}.
         Look for IoT, automation, robotics, smart technology implementations.
-        Return 'Yes - [technology]' or 'No' or specific adoption details.
+        Return specific adoption details or 'No implementation found'.
         """,
         
         "cloud_adoption_gcc_setup": f"""
@@ -299,15 +343,17 @@ def dynamic_extract_field_with_sources(company_name: str, field_name: str, searc
     IMPORTANT: 
     - Base your answer ONLY on the research provided above
     - If information is not found in research, return 'N/A'
-    - Be concise and factual
+    - Be concise and factual - NO explanatory text
     - Return ONLY the extracted information, no explanations
-    
+    - For URLs: return only the clean, complete URL
+    - For text: return clean, concise information without prefixes
+
     EXTRACTED INFORMATION:
     """
     
     try:
         response = llm_groq.invoke([
-            SystemMessage(content="You are a precise information extraction agent. Extract only facts found in the research. Return 'N/A' if information is not available."),
+            SystemMessage(content="You are a precise information extraction agent. Extract only facts found in the research. Return 'N/A' if information is not available. NEVER add explanatory text."),
             HumanMessage(content=prompt)
         ]).content.strip()
         
@@ -317,17 +363,18 @@ def dynamic_extract_field_with_sources(company_name: str, field_name: str, searc
             len(response) < 3):
             return "N/A"
         
-        # Clean up any explanatory text
-        if ":" in response and len(response.split(":")) > 1:
-            parts = response.split(":", 1)
-            if len(parts[0].split()) < 4:  # If first part is short label
-                response = parts[1].strip()
+        # Clean the response
+        response = clean_text_content(response)
+        
+        # Special handling for URL fields
+        if field_name in ['linkedin_url', 'company_website_url']:
+            response = clean_and_format_url(response)
         
         # Limit response length
         response = response[:250].strip()
         
-        # Add source URLs if we have valid information
-        if unique_urls and response != "N/A":
+        # Add source URLs if we have valid information (except for URL fields)
+        if unique_urls and response != "N/A" and field_name not in ['linkedin_url', 'company_website_url']:
             source_text = f" [Sources: {', '.join(unique_urls[:2])}]" if len(unique_urls) > 1 else f" [Source: {unique_urls[0]}]"
             response += source_text
             
@@ -337,7 +384,7 @@ def dynamic_extract_field_with_sources(company_name: str, field_name: str, searc
         st.warning(f"Extraction failed for {field_name}: {str(e)[:100]}...")
         return "N/A"
 
-# --- FIXED: Generate Relevance Analysis with Fallback ---
+# --- FIXED: Generate Clean Relevance Analysis ---
 def generate_dynamic_relevance_analysis(company_data: Dict, company_name: str, all_search_results: List[Dict]) -> tuple:
     """Generate dynamic relevance analysis based on actual company data"""
     
@@ -371,19 +418,19 @@ def generate_dynamic_relevance_analysis(company_data: Dict, company_name: str, a
     
     Then provide an INTENT SCORE: High/Medium/Low based on concrete signals in the data.
     
-    FORMAT EXACTLY:
+    FORMAT EXACTLY (CLEAN FORMAT - NO MARKDOWN):
     BULLETS:
-    1) [Specific opportunity] - [Syntel solution match]
-    2) [Technology need] - [Syntel capability] 
-    3) [Business signal] - [Service alignment]
+    1. [Specific opportunity] - [Syntel solution match]
+    2. [Technology need] - [Syntel capability] 
+    3. [Business signal] - [Service alignment]
     SCORE: High/Medium/Low
     
-    Be specific and evidence-based from the company data.
+    Be specific and evidence-based from the company data. Use clean, professional language.
     """
     
     try:
         response = llm_groq.invoke([
-            SystemMessage(content="You analyze business relevance for IT services. Be specific, evidence-based, and actionable."),
+            SystemMessage(content="You analyze business relevance for IT services. Be specific, evidence-based, and actionable. Use clean, professional formatting."),
             HumanMessage(content=relevance_prompt)
         ]).content
         
@@ -398,28 +445,39 @@ def generate_dynamic_relevance_analysis(company_data: Dict, company_name: str, a
             line = line.strip()
             if line.startswith('BULLETS:') or bullet_section:
                 bullet_section = True
-                if line.startswith(('1)', '2)', '3)', '•', '-')) and len(line) > 5:
-                    # Clean and format bullet
-                    clean_line = re.sub(r'^[1-3\)•\-]\s*', '', line)
+                if (line.startswith(('1', '2', '3', '•', '-')) and len(line) > 5 and 
+                    not line.startswith('SCORE:')):
+                    # Clean and format bullet - remove numbers and dots
+                    clean_line = re.sub(r'^[1-3][\.\)]\s*', '', line)
+                    clean_line = re.sub(r'^[•\-]\s*', '', clean_line)
                     bullets.append(f"• {clean_line}")
             elif 'SCORE:' in line.upper():
                 if 'HIGH' in line.upper():
                     score = "High"
                 elif 'LOW' in line.upper():
                     score = "Low"
+                bullet_section = False  # Stop bullet collection
         
         # Ensure we have 3 bullets
         while len(bullets) < 3:
             bullets.append(f"• Additional IT service opportunity identified for {company_name}")
         
-        formatted_bullets = "\n".join(bullets[:3])
+        # Clean up bullets
+        cleaned_bullets = []
+        for bullet in bullets[:3]:
+            # Remove any remaining markdown or messy formatting
+            clean_bullet = re.sub(r'\*\*|\*|__|_', '', bullet)  # Remove bold/italic
+            clean_bullet = re.sub(r'\s+', ' ', clean_bullet).strip()
+            cleaned_bullets.append(clean_bullet)
+        
+        formatted_bullets = "\n".join(cleaned_bullets)
         return formatted_bullets, score
         
     except Exception as e:
         st.warning(f"Relevance analysis failed: {str(e)[:100]}...")
-        fallback_bullets = f"""• {company_name} shows IT infrastructure modernization potential
-• Digital transformation opportunities identified  
-• Potential alignment with Syntel's automation expertise"""
+        fallback_bullets = f"""• Digital transformation opportunities identified
+• IT infrastructure modernization potential
+• Alignment with Syntel's automation expertise"""
         return fallback_bullets, "Medium"
 
 # --- FIXED: Main Research Function with Better Error Handling ---
@@ -474,9 +532,9 @@ def dynamic_research_company_intelligence(company_name: str) -> Dict[str, Any]:
     
     return company_data
 
-# --- Display Functions ---
+# --- FIXED: Clean Display Formatting ---
 def format_concise_display_with_sources(company_input: str, data_dict: dict) -> pd.DataFrame:
-    """Transform data into concise display format with sources"""
+    """Transform data into clean, professional display format"""
     
     mapping = {
         "Company Name": "company_name",
@@ -507,29 +565,55 @@ def format_concise_display_with_sources(company_input: str, data_dict: dict) -> 
         else:
             value = data_dict.get(data_field, "N/A")
         
-        # Format bullet points
+        # Clean the value
+        if value != "N/A":
+            # Remove extraction prefixes and clean text
+            value = clean_text_content(str(value))
+            
+            # Clean URLs specifically
+            if display_col in ["LinkedIn URL", "Company Website URL"]:
+                value = clean_and_format_url(value)
+        
+        # Format bullet points for relevance section
         if data_field == "why_relevant_to_syntel_bullets":
-            if isinstance(value, str):
+            if isinstance(value, str) and value != "N/A":
                 # Clean and format bullets
                 cleaned_value = value.replace('1)', '•').replace('2)', '•').replace('3)', '•')
+                cleaned_value = re.sub(r'^\d\.\s*', '• ', cleaned_value, flags=re.MULTILINE)
+                cleaned_value = re.sub(r'\*\*|\*', '', cleaned_value)  # Remove markdown
                 html_value = cleaned_value.replace('\n', '<br>')
-                data_list.append({"Column Header": display_col, "Value": f'<div style="text-align: left;">{html_value}</div>'})
+                data_list.append({"Column Header": display_col, "Value": f'<div style="text-align: left; line-height: 1.4;">{html_value}</div>'})
             else:
                 data_list.append({"Column Header": display_col, "Value": str(value)})
         else:
-            # For fields with URLs, make them clickable
-            if isinstance(value, str) and "http" in value:
-                # Convert URLs to clickable links
-                url_pattern = r'(\[Source: (https?://[^\]]+)\])'
-                def make_clickable(match):
-                    full_text = match.group(1)
-                    url = match.group(2)
-                    return f'[<a href="{url}" target="_blank">Source</a>]'
+            # For fields with source URLs, format them cleanly
+            if isinstance(value, str) and "http" in value and "Source" in value:
+                # Extract the main content and sources separately
+                main_content = value.split(' [Source')[0] if ' [Source' in value else value
+                sources_part = value.split(' [Source')[1] if ' [Source' in value else ""
                 
-                value_with_links = re.sub(url_pattern, make_clickable, value)
-                data_list.append({"Column Header": display_col, "Value": f'<div style="text-align: left;">{value_with_links}</div>'})
+                # Format sources as clean links
+                if sources_part:
+                    # Extract URLs from sources
+                    urls = re.findall(r'https?://[^\s,\]]+', sources_part)
+                    if urls:
+                        source_links = []
+                        for i, url in enumerate(urls[:2]):  # Max 2 sources
+                            clean_url = clean_and_format_url(url)
+                            source_links.append(f'<a href="{clean_url}" target="_blank">Source {i+1}</a>')
+                        
+                        sources_html = f"<br><small>Sources: {', '.join(source_links)}</small>"
+                        display_value = f'<div style="text-align: left; line-height: 1.4;">{main_content}{sources_html}</div>'
+                    else:
+                        display_value = f'<div style="text-align: left;">{main_content}</div>'
+                else:
+                    display_value = f'<div style="text-align: left;">{main_content}</div>'
+                
+                data_list.append({"Column Header": display_col, "Value": display_value})
             else:
-                data_list.append({"Column Header": display_col, "Value": str(value)})
+                # Regular text formatting
+                display_value = f'<div style="text-align: left; line-height: 1.4;">{value}</div>'
+                data_list.append({"Column Header": display_col, "Value": display_value})
             
     return pd.DataFrame(data_list)
 
@@ -537,11 +621,11 @@ def format_concise_display_with_sources(company_input: str, data_dict: dict) -> 
 st.set_page_config(
     page_title="Dynamic Syntel BI Agent",
     layout="wide",
-    page_icon=""
+    page_icon="🔍"
 )
 
-st.title("Syntel Dynamic Company Data AI Agent")
-st.markdown("### 🚀 Dynamic Research with Real-time Search")
+st.title("🔍 Syntel Dynamic Company Data AI Agent")
+st.markdown("### 🚀 Professional Business Intelligence Reports")
 
 # Display enhanced approach
 with st.expander("🚀 Dynamic Research Approach", expanded=True):
@@ -549,10 +633,11 @@ with st.expander("🚀 Dynamic Research Approach", expanded=True):
     **Enhanced Dynamic Features:**
     
     - **🧠 Smart Search**: Multiple query attempts per field
-    - **🔍 Real-time Data**: No static/default values
+    - **🔍 Real-time Data**: No static/default values  
     - **📊 Evidence-Based**: All information sourced from live searches
     - **🎯 Company-Specific**: Tailored research for each company
     - **⚡ Adaptive Extraction**: LLM analyzes actual search results
+    - **✨ Clean Formatting**: Professional, readable output
     
     **Research Process:**
     1. Generate dynamic search queries for each field
@@ -565,7 +650,7 @@ with st.expander("🚀 Dynamic Research Approach", expanded=True):
 # Input section
 col1, col2 = st.columns([2, 1])
 with col1:
-    company_input = st.text_input("Enter the company name to research:", "Snowman Logistics")
+    company_input = st.text_input("Enter the company name to research:", "Neuberg Diagnostics")
 with col2:
     with st.form("research_form"):
         submitted = st.form_submit_button("🚀 Start Dynamic Research", type="primary")
@@ -587,6 +672,26 @@ if submitted:
             # Display final results
             st.subheader(f"Business Intelligence Report for {company_input}")
             final_df = format_concise_display_with_sources(company_input, company_data)
+            
+            # Apply custom CSS for better styling
+            st.markdown("""
+            <style>
+            .dataframe {
+                width: 100%;
+            }
+            .dataframe th {
+                background-color: #f0f2f6;
+                padding: 12px;
+                text-align: left;
+                font-weight: bold;
+            }
+            .dataframe td {
+                padding: 12px;
+                border-bottom: 1px solid #ddd;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+            
             st.markdown(final_df.to_html(escape=False, header=True, index=False), unsafe_allow_html=True)
             
             # Show completion metrics
@@ -606,7 +711,12 @@ if submitted:
                 with col2:
                     st.metric("Fields with Sources", f"{fields_with_sources}/{len(REQUIRED_FIELDS)-2}")
                 with col3:
-                    st.metric("Intent Score", company_data.get("intent_scoring_level", "Medium"))
+                    score_color = {
+                        "High": "green", 
+                        "Medium": "orange", 
+                        "Low": "red"
+                    }.get(company_data.get("intent_scoring_level", "Medium"), "gray")
+                    st.markdown(f"<h3 style='color: {score_color};'>Intent Score: {company_data.get('intent_scoring_level', 'Medium')}</h3>", unsafe_allow_html=True)
             
             # Download options
             st.subheader("💾 Download Report")
@@ -673,7 +783,7 @@ if st.session_state.research_history:
 st.markdown("---")
 st.markdown(
     "<div style='text-align: center; color: gray;'>"
-    "Dynamic Syntel BI Agent | Real-time Company Intelligence"
+    "Dynamic Syntel BI Agent | Professional Business Intelligence"
     "</div>",
     unsafe_allow_html=True
 )
