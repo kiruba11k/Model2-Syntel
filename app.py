@@ -45,7 +45,7 @@ REQUIRED_FIELDS = [
     "why_relevant_to_syntel_bullets", "intent_scoring_level"
 ]
 
-# --- Syntel Core Offerings ---
+# --- Syntel Core Offerings (No Change) ---
 SYNTEL_EXPERTISE = """
 Syntel specializes in:
 1. IT Automation/RPA: SyntBots platform
@@ -54,7 +54,7 @@ Syntel specializes in:
 4. KPO/BPO: Industry-specific solutions
 """
 
-# --- Enhanced Dynamic Search Queries ---
+# --- Enhanced Dynamic Search Queries (No Change) ---
 def generate_dynamic_search_queries(company_name: str, field_name: str) -> List[str]:
     """Generate dynamic search queries based on company and field"""
     
@@ -128,7 +128,7 @@ def generate_dynamic_search_queries(company_name: str, field_name: str) -> List[
     
     return field_queries.get(field_name, [f'"{company_name}" {field_name}'])
 
-# --- Enhanced Search with Multiple Queries ---
+# --- Enhanced Search with Multiple Queries (No Change) ---
 def dynamic_search_for_field(company_name: str, field_name: str) -> List[Dict]:
     """Dynamic search for specific field information with multiple query attempts"""
     queries = generate_dynamic_search_queries(company_name, field_name)
@@ -169,7 +169,7 @@ def dynamic_search_for_field(company_name: str, field_name: str) -> List[Dict]:
     
     return all_results
 
-# --- URL Cleaning Functions ---
+# --- URL Cleaning Functions (No Change) ---
 def clean_and_format_url(url: str) -> str:
     """Clean and format URLs"""
     if not url or url == "N/A":
@@ -184,65 +184,77 @@ def clean_and_format_url(url: str) -> str:
     
     return url
 
-# --- Enhanced Extraction Prompts ---
+# --- CRITICAL MODIFICATION: Enhanced Extraction Prompts for Single Fact ---
 def get_detailed_extraction_prompt(company_name: str, field_name: str, research_context: str) -> str:
-    """Get detailed extraction prompts for each field"""
+    """Get detailed extraction prompts for each field with strict single-fact requirements"""
     
-    # Prompts are optimized to ask for FACTUAL DATA ONLY and nothing else.
     prompts = {
-        "revenue_source": f"""
-        Extract ONLY the annual revenue (in USD, if possible) and key financial facts for {company_name}.
-        Include specific numbers, percentages, and time periods (FY 2024, Q1 2025, etc.).
+        "industry_category": f"""
+        Analyze the research data and provide ONLY the single best-fit, primary industry category for {company_name}.
         
         RESEARCH DATA:
         {research_context}
         
         REQUIREMENTS:
-        - Output must be short, factual, and extremely concise.
+        - Output ONE single industry/sector (e.g., 'Cold Chain Logistics' or 'Pharmaceutical Manufacturing').
         - Start directly with the extracted data.
         
-        EXTRACTED FINANCIAL INFORMATION:
-        """,
-        
-        "headquarters_location": f"""
-        Extract ONLY the full, complete headquarters address for {company_name}.
-        
-        RESEARCH DATA:
-        {research_context}
-        
-        REQUIREMENTS:
-        - Output must be the complete official address only.
-        - Start directly with the extracted data.
-        
-        EXTRACTED HEADQUARTERS ADDRESS:
-        """,
-        
-        "branch_network_count": f"""
-        Extract ONLY the total number of facilities/branches/locations and key capacity facts for {company_name}.
-        
-        RESEARCH DATA:
-        {research_context}
-        
-        REQUIREMENTS:
-        - Provide specific counts and key locations (e.g., '43 branches, 8 facilities, expansion in Chennai').
-        - Start directly with the extracted data.
-        
-        EXTRACTED NETWORK INFORMATION:
+        EXTRACTED PRIMARY INDUSTRY:
         """,
         
         "employee_count_linkedin": f"""
-        Extract ONLY the current employee count range from LinkedIn and any associated specific number.
+        Extract ONLY the single most credible or largest employee count/range for {company_name}. If multiple are found, prioritize the LinkedIn range or the largest confirmed number.
         
         RESEARCH DATA:
         {research_context}
         
         REQUIREMENTS:
-        - Provide specific employee ranges (e.g., '501-1,000 employees (LinkedIn), 1087 associated members').
+        - Output ONE single value (e.g., '1,001-5,000 employees (LinkedIn)' or '3,500 employees confirmed').
         - Start directly with the extracted data.
         
         EXTRACTED EMPLOYEE COUNT:
         """,
         
+        "headquarters_location": f"""
+        Extract ONLY the full, complete headquarters address for {company_name}, including the country.
+        
+        RESEARCH DATA:
+        {research_context}
+        
+        REQUIREMENTS:
+        - Output the complete official address as ONE single string (e.g., '123 Tech Park Rd, Dallas, TX, USA').
+        - Start directly with the extracted data.
+        
+        EXTRACTED HEADQUARTERS ADDRESS:
+        """,
+        
+        "revenue_source": f"""
+        Extract ONLY the latest and most relevant annual or quarterly revenue figure for {company_name}. Convert the final number to USD (with period) and provide ONE concise fact.
+        
+        RESEARCH DATA:
+        {research_context}
+        
+        REQUIREMENTS:
+        - Output ONE single value (e.g., 'USD 19.3 million (FY 2025-26 Est.)' or 'USD 450M Annual Revenue (FY 2024)').
+        - Start directly with the extracted data.
+        
+        EXTRACTED REVENUE INFORMATION:
+        """,
+        
+        "branch_network_count": f"""
+        Extract ONLY the total number of facilities/branches/locations as a single count for {company_name}.
+        
+        RESEARCH DATA:
+        {research_context}
+        
+        REQUIREMENTS:
+        - Output ONE single total count (e.g., '542 locations' or '14 facilities with 61,543 pallet capacity').
+        - Start directly with the extracted data.
+        
+        EXTRACTED NETWORK COUNT:
+        """,
+        
+        # Other prompts remain the same as they require specific lists of facts
         "expansion_news_12mo": f"""
         Extract ONLY the most recent and significant expansion news for {company_name} from the last 12-24 months.
         
@@ -269,6 +281,45 @@ def get_detailed_extraction_prompt(company_name: str, field_name: str, research_
         EXTRACTED DIGITAL INITIATIVES:
         """,
         
+        "it_leadership_change": f"""
+        Extract ONLY the key details of any significant IT leadership change (CIO, CTO, etc.) for {company_name} in the last 24 months.
+        
+        RESEARCH DATA:
+        {research_context}
+        
+        REQUIREMENTS:
+        - Provide name, role, and the change (e.g., 'Sunil Nair stepped down as CEO in Q4 2024, new leadership not yet named.').
+        - Start directly with the extracted data.
+        
+        EXTRACTED LEADERSHIP CHANGE:
+        """,
+        
+        "existing_network_vendors": f"""
+        Extract ONLY the key technology and network vendors mentioned for {company_name}.
+        
+        RESEARCH DATA:
+        {research_context}
+        
+        REQUIREMENTS:
+        - List specific vendors (e.g., 'Cisco, VMware, SAP, Microsoft').
+        - Start directly with the extracted data.
+        
+        EXTRACTED VENDORS:
+        """,
+        
+        "wifi_lan_tender_found": f"""
+        Extract ONLY specific information about any Wi-Fi/LAN or network tender/project found for {company_name}.
+        
+        RESEARCH DATA:
+        {research_context}
+        
+        REQUIREMENTS:
+        - Provide details of the tender/project (e.g., 'RFP for WAN upgrade in Q3 2025' or 'No specific tender found.').
+        - Start directly with the extracted data.
+        
+        EXTRACTED TENDER INFORMATION:
+        """,
+        
         "iot_automation_edge_integration": f"""
         Extract ONLY the key IoT, Automation, and Edge computing implementations for {company_name}.
         
@@ -280,6 +331,19 @@ def get_detailed_extraction_prompt(company_name: str, field_name: str, research_
         - Start directly with the extracted data.
         
         EXTRACTED IOT/AUTOMATION DETAILS:
+        """,
+        
+        "cloud_adoption_gcc_setup": f"""
+        Extract ONLY the key Cloud Adoption or Global Capability Center (GCC) setup details for {company_name}.
+        
+        RESEARCH DATA:
+        {research_context}
+        
+        REQUIREMENTS:
+        - Specify cloud providers, migration status, or GCC plans (e.g., 'Hybrid Cloud model with Azure, no GCC plans found.').
+        - Start directly with the extracted data.
+        
+        EXTRACTED CLOUD/GCC DETAILS:
         """,
         
         "physical_infrastructure_signals": f"""
@@ -322,14 +386,14 @@ def get_detailed_extraction_prompt(company_name: str, field_name: str, research_
     EXTRACTED INFORMATION:
     """)
 
-# --- Enhanced Dynamic Extraction ---
+# --- CRITICAL MODIFICATION: Enhanced Dynamic Extraction (Cleaning) ---
 def dynamic_extract_field_with_sources(company_name: str, field_name: str, search_results: List[Dict]) -> str:
     """Enhanced extraction with better source utilization and accuracy"""
     
     if not search_results:
         return "N/A"
     
-    # SPECIAL HANDLING: For URLs
+    # SPECIAL HANDLING: For URLs (No Change)
     if field_name == "linkedin_url":
         for result in search_results:
             url = result.get('url', '')
@@ -358,7 +422,7 @@ def dynamic_extract_field_with_sources(company_name: str, field_name: str, searc
     prompt = get_detailed_extraction_prompt(company_name, field_name, research_context)
     
     try:
-        # --- CRITICAL MODIFICATION: Finalized System Message for MAX Conciseness ---
+        # Finalized System Message for MAX Conciseness 
         response = llm_groq.invoke([
             SystemMessage(content=f"""You are an expert research analyst. Extract FACTUAL DATA ONLY from the provided research context for {company_name}.
             **The output must be EXTREMELY CONCISE, FACTUAL, and SHORT (under 100 words).**
@@ -374,25 +438,25 @@ def dynamic_extract_field_with_sources(company_name: str, field_name: str, searc
             return "N/A"
         
         # --- CRITICAL MODIFICATION: Expanded Aggressive Cleaning ---
-        # Added more patterns to catch LLM conversational habits and clean up list markers
+        # Added regex to handle multiple lines and list artifacts that the LLM may still output
         clean_up_phrases = [
             r'^\s*Based on the provided research data,.*:',
             r'^\s*Here is the extracted information:',
             r'^\s*The key information is:',
             r'^\s*Extracted information:',
             r'^\s*The relevant data is:',
-            r'^\s*Here\'s the comprehensive information about the industry categor', 
             r'^\s*The headquarters address for [A-Za-z\s]+ is:',
             r'^\s*Annual Revenue:',
-            r'^\s*Components of the address:',
             r'^\s*Key Financial Facts:',
             r'^\s*New facilities:',
             r'^\s*Geographic expansions:',
-            r'^\s*Snowman Logistics has:',
             r'^\s*[A-Za-z\s]+ has:',
-            r'^\s*\*\s*', # Remove list marker at start
-            r'^\s*-\s*', # Remove list marker at start
-            r'^\s*\d+\.\s*', # Remove numbered list marker at start
+            r'^\s*The single best-fit, primary industry category is:', # Specific prompt follow-up
+            r'^\s*The most definitive employee count is:', # Specific prompt follow-up
+            r'^\s*The latest revenue figure is:', # Specific prompt follow-up
+            r'^\s*\*\s*', 
+            r'^\s*-\s*', 
+            r'^\s*\d+\.\s*', 
         ]
         
         for phrase in clean_up_phrases:
@@ -404,13 +468,10 @@ def dynamic_extract_field_with_sources(company_name: str, field_name: str, searc
         response = re.sub(r'\s+', ' ', response) # Consolidate multiple spaces
         response = response.replace("**", "").replace("*", "") # Remove bolding/emphasis
         
-        # Special cleaning for industry category
-        if field_name == "industry_category":
-            return response.split('\n')[0].strip()[:100]
-        
         # Add sources for all fields except the basic ones
-        if field_name not in ["linkedin_url", "company_website_url", "industry_category"]:
+        if field_name not in ["linkedin_url", "company_website_url"]:
             if unique_urls and response != "N/A":
+                # Only include sources if data is present and non-basic
                 source_text = f" [Sources: {', '.join(unique_urls[:2])}]" if len(unique_urls) > 1 else f" [Source: {unique_urls[0]}]"
                 response += source_text
         
@@ -419,7 +480,8 @@ def dynamic_extract_field_with_sources(company_name: str, field_name: str, searc
     except Exception as e:
         return "N/A"
 
-# --- Enhanced Relevance Analysis ---
+# --- Relevance Analysis and UI (No Major Change) ---
+
 def generate_dynamic_relevance_analysis(company_data: Dict, company_name: str, all_search_results: List[Dict]) -> tuple:
     """Generate comprehensive relevance analysis"""
     
@@ -503,7 +565,7 @@ def generate_dynamic_relevance_analysis(company_data: Dict, company_name: str, a
         
         # Ensure we have 3 quality bullets
         while len(bullets) < 3:
-            # Modified fallback to be less conversational
+            # Final fallback bullet (cleaner)
             bullets.append(f"• Potential IT service opportunity based on company growth and operational strategy.")
         
         # Clean bullets
