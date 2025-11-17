@@ -199,25 +199,43 @@ def clean_text_content(text: str) -> str:
     if not text or text == "N/A":
         return "N/A"
     
-    # Remove extra newlines and spaces
-    text = re.sub(r'\n+', '\n', text)
-    text = re.sub(r'[ ]+', ' ', text)
+    # Remove URLs from text content
+    text = re.sub(r'https?://\S+', '', text)
     
-    # Remove extraction prefixes
+    # Remove extraction prefixes and irrelevant phrases
     prefixes_to_remove = [
         "Extracted Digital/IT Transformation Initiatives for",
         "Extract the",
         "Revenue/Business Model Information for",
-        "IT Leadership Information for",
+        "IT Leadership Information for", 
         "WiFi/LAN/network upgrade information for",
-        "Extracted"
+        "Extracted",
+        "IT infrastructure budget/capex information for",
+        "Neuberg Diagnostics:",
+        "Snowman Logistics:",
+        "URLs?:",
+        "URL 1:",
+        "URL 2:",
+        "- URL 1:",
+        "- URL 2:",
+        "URL:",
+        "URL",
+        "http",
+        "https",
+        "www.",
+        ".com",
+        ".org",
+        ".in"
     ]
     
     for prefix in prefixes_to_remove:
-        if text.startswith(prefix):
-            text = text[len(prefix):].strip()
-            if text.startswith(':'):
-                text = text[1:].strip()
+        text = text.replace(prefix, '')
+    
+    # Remove extra newlines and spaces
+    text = re.sub(r'\n+', '\n', text)
+    text = re.sub(r'[ ]+', ' ', text)
+    text = re.sub(r'-\s+N/A', '', text)  # Remove "- N/A" patterns
+    text = re.sub(r'N/A', '', text)  # Remove standalone N/A
     
     return text.strip()
 
@@ -239,6 +257,58 @@ def extract_single_linkedin_url(search_results: List[Dict]) -> str:
     # Return the first valid LinkedIn URL or N/A
     return linkedin_urls[0] if linkedin_urls else "N/A"
 
+# --- FIXED: Extract Single Company Website URL ---
+def extract_single_website_url(search_results: List[Dict]) -> str:
+    """Extract a single, clean company website URL from search results"""
+    website_urls = []
+    
+    for result in search_results:
+        content = result.get('content', '').lower()
+        url = result.get('url', '')
+        
+        # Look for company website URLs (exclude LinkedIn, social media, etc.)
+        if (any(domain in url.lower() for domain in ['.com', '.in', '.org']) and
+            not any(social in url.lower() for social in ['linkedin', 'facebook', 'twitter', 'youtube', 'instagram'])):
+            clean_url = clean_and_format_url(url)
+            if clean_url not in website_urls:
+                website_urls.append(clean_url)
+    
+    # Return the first valid website URL or N/A
+    return website_urls[0] if website_urls else "N/A"
+
+# --- FIXED: Clean Extraction for Specific Fields ---
+def extract_clean_field_data(field_name: str, response: str) -> str:
+    """Clean and format field-specific data"""
+    if not response or response == "N/A":
+        return "N/A"
+    
+    # Field-specific cleaning rules
+    cleaning_rules = {
+        "employee_count_linkedin": lambda x: re.sub(r'https?://\S+', '', x).split('\n')[0].strip(),
+        "headquarters_location": lambda x: re.sub(r'https?://\S+', '', x).split('\n')[0].strip(),
+        "revenue_source": lambda x: re.sub(r'https?://\S+', '', x).split('\n')[0].strip(),
+        "branch_network_count": lambda x: re.sub(r'- N/A\s*', '', re.sub(r'https?://\S+', '', x)),
+        "expansion_news_12mo": lambda x: re.sub(r'https?://\S+', '', x).split('- http')[0].strip(),
+        "digital_transformation_initiatives": lambda x: re.sub(r'https?://\S+', '', x).split('- http')[0].strip(),
+        "it_leadership_change": lambda x: re.sub(r'https?://\S+', '', x).split('URLs?:')[0].strip(),
+        "existing_network_vendors": lambda x: re.sub(r'https?://\S+', '', x).split('https')[0].strip(),
+        "wifi_lan_tender_found": lambda x: re.sub(r'https?://\S+', '', x).split('- http')[0].strip(),
+        "iot_automation_edge_integration": lambda x: re.sub(r'https?://\S+', '', x).split('- http')[0].strip(),
+        "cloud_adoption_gcc_setup": lambda x: re.sub(r'https?://\S+', '', x),
+        "physical_infrastructure_signals": lambda x: re.sub(r'https?://\S+', '', x).split('- http')[0].strip(),
+        "it_infra_budget_capex": lambda x: re.sub(r'https?://\S+', '', x).split('https')[0].strip()
+    }
+    
+    cleaner = cleaning_rules.get(field_name, lambda x: re.sub(r'https?://\S+', '', x))
+    cleaned_response = cleaner(response)
+    
+    # Final cleanup
+    cleaned_response = re.sub(r'\s+', ' ', cleaned_response)
+    cleaned_response = re.sub(r'\n+', ' ', cleaned_response)
+    cleaned_response = cleaned_response.strip()
+    
+    return cleaned_response[:300] if cleaned_response else "N/A"
+
 # --- FIXED: Dynamic Extraction with Clean Formatting ---
 def dynamic_extract_field_with_sources(company_name: str, field_name: str, search_results: List[Dict]) -> str:
     """Dynamically extract information based on actual search results"""
@@ -250,132 +320,127 @@ def dynamic_extract_field_with_sources(company_name: str, field_name: str, searc
     if field_name == "linkedin_url":
         return extract_single_linkedin_url(search_results)
     
+    # SPECIAL HANDLING: For Company Website URL, extract only one URL without sources
+    if field_name == "company_website_url":
+        return extract_single_website_url(search_results)
+    
     # Format research data for context
     research_context = f"Research context for {field_name}:\n"
     for i, result in enumerate(search_results[:3]):
-        research_context += f"[Source {i+1}]: {result['content'][:300]}\n"
+        clean_content = re.sub(r'https?://\S+', '', result['content'][:300])
+        research_context += f"[Source {i+1}]: {clean_content}\n"
         research_context += f"[URL {i+1}]: {result['url']}\n\n"
     
     # Get unique source URLs
     unique_urls = list(set([result['url'] for result in search_results if result.get('url')]))[:2]
     
-    # Dynamic extraction prompts
+    # STRICT extraction prompts
     extraction_prompts = {
-        "linkedin_url": f"""
-        Extract the LinkedIn company page URL for {company_name} from the research.
-        Look for patterns like linkedin.com/company/ or linkedin.com/company-name/
-        Return ONLY the full URL or 'N/A' if not found.
-        """,
-        
-        "company_website_url": f"""
-        Extract the official website URL for {company_name} from the research.
-        Look for main domain URLs. Return ONLY the URL or 'N/A'.
-        """,
-        
         "industry_category": f"""
-        Extract the primary industry/business category for {company_name} based on the research.
-        Be specific: 'Temperature Controlled Logistics', 'Cold Chain Logistics', 'Supply Chain', etc.
-        Return 2-4 word category only.
+        Extract ONLY the primary industry/business category for {company_name}.
+        Return exactly 2-4 words like 'Clinical Laboratory Testing' or 'Cold Chain Logistics'.
+        NO URLs, NO explanations, NO additional text.
         """,
         
         "employee_count_linkedin": f"""
-        Extract employee count information for {company_name}.
-        Look for numbers like '500 employees', '1,000-5,000', etc.
-        Return just the number/range or 'N/A'.
+        Extract ONLY the employee count information for {company_name}.
+        Return exactly the number/range like '501-1,000 employees' or '1,001-5,000 employees'.
+        NO URLs, NO explanations, NO additional text.
         """,
         
         "headquarters_location": f"""
-        Extract headquarters location for {company_name}.
-        Format: 'City, State' or 'City, Country'.
-        Return location only.
+        Extract ONLY the headquarters location for {company_name}.
+        Return exactly the location like 'Chennai, India' or 'Navi Mumbai, Maharashtra'.
+        NO URLs, NO explanations, NO additional text.
         """,
         
         "revenue_source": f"""
-        Extract revenue/business model information for {company_name}.
-        Look for revenue numbers, business model descriptions.
-        Return concise revenue info or business model.
+        Extract ONLY the revenue information for {company_name}.
+        Return exactly the revenue numbers or business model.
+        NO URLs, NO explanations, NO additional text.
         """,
         
         "branch_network_count": f"""
-        Extract branch/network/facility count information for {company_name}.
-        Look for numbers of warehouses, branches, locations, capacity.
-        Return concise facility/network description.
+        Extract ONLY the branch/network/facility information for {company_name}.
+        Return exactly the count and description of facilities.
+        NO URLs, NO explanations, NO additional text.
         """,
         
         "expansion_news_12mo": f"""
-        Extract recent expansion/growth news for {company_name} from last 12-24 months.
-        Look for new facilities, expansions, growth announcements.
-        Return concise expansion details with locations/dates if available.
+        Extract ONLY recent expansion/growth news for {company_name} from last 12-24 months.
+        Return exactly the expansion details with locations/dates.
+        NO URLs, NO explanations, NO additional text.
         """,
         
         "digital_transformation_initiatives": f"""
-        Extract digital/IT transformation initiatives for {company_name}.
-        Look for ERP, automation, digitalization, technology projects.
-        Return concise technology initiative description without explanatory text.
+        Extract ONLY digital/IT transformation initiatives for {company_name}.
+        Return exactly the technology projects and initiatives.
+        NO URLs, NO explanations, NO additional text.
         """,
         
         "it_leadership_change": f"""
-        Extract IT leadership information for {company_name}.
-        Look for CIO, CTO, IT director names and changes.
-        Return names/positions or 'N/A' if no specific info.
+        Extract ONLY IT leadership information for {company_name}.
+        Return exactly the names/positions of CIO, CTO, IT Director.
+        NO URLs, NO explanations, NO additional text.
         """,
         
         "existing_network_vendors": f"""
-        Extract technology vendors/partners for {company_name}.
-        Look for mentions of Cisco, SAP, Oracle, Microsoft, etc.
-        Return vendor names or 'N/A'.
+        Extract ONLY technology vendors/partners for {company_name}.
+        Return exactly the vendor names like Cisco, SAP, Oracle.
+        NO URLs, NO explanations, NO additional text.
         """,
         
         "wifi_lan_tender_found": f"""
-        Extract WiFi/LAN/network upgrade information for {company_name}.
-        Look for network projects, tenders, upgrades.
-        Return brief description or 'N/A'.
+        Extract ONLY WiFi/LAN/network upgrade information for {company_name}.
+        Return exactly the network project details.
+        NO URLs, NO explanations, NO additional text.
         """,
         
         "iot_automation_edge_integration": f"""
-        Extract IoT/Automation/Edge computing adoption for {company_name}.
-        Look for IoT, automation, robotics, smart technology implementations.
-        Return specific adoption details or 'No implementation found'.
+        Extract ONLY IoT/Automation/Edge computing adoption for {company_name}.
+        Return exactly the technology adoption details.
+        NO URLs, NO explanations, NO additional text.
         """,
         
         "cloud_adoption_gcc_setup": f"""
-        Extract cloud adoption/GCC setup for {company_name}.
-        Look for AWS, Azure, Google Cloud, cloud migration.
-        Return cloud adoption status with platforms if mentioned.
+        Extract ONLY cloud adoption/GCC setup for {company_name}.
+        Return exactly the cloud platform usage.
+        NO URLs, NO explanations, NO additional text.
         """,
         
         "physical_infrastructure_signals": f"""
-        Extract physical infrastructure developments for {company_name}.
-        Look for new construction, facility expansions, infrastructure projects.
-        Return concise infrastructure developments.
+        Extract ONLY physical infrastructure developments for {company_name}.
+        Return exactly the construction and expansion details.
+        NO URLs, NO explanations, NO additional text.
         """,
         
         "it_infra_budget_capex": f"""
-        Extract IT infrastructure budget/capex information for {company_name}.
-        Look for IT spending, technology investments, budget announcements.
-        Return budget/capex details or 'Not publicly disclosed'.
+        Extract ONLY IT infrastructure budget/capex information for {company_name}.
+        Return exactly the budget and investment details.
+        NO URLs, NO explanations, NO additional text.
         """
     }
     
     prompt = f"""
-    TASK: {extraction_prompts.get(field_name, f"Extract {field_name} for {company_name}")}
-    
+    RESEARCH DATA:
     {research_context}
     
-    IMPORTANT: 
-    - Base your answer ONLY on the research provided above
-    - If information is not found in research, return 'N/A'
-    - Be concise and factual - NO explanatory text
-    - Return ONLY the extracted information, no explanations
-    - For URLs: return only the clean, complete URL
-    - For text: return clean, concise information without prefixes
-
+    TASK: {extraction_prompts.get(field_name, f"Extract ONLY {field_name} for {company_name}")}
+    
+    CRITICAL INSTRUCTIONS:
+    - Extract ONLY the specific information requested
+    - NO URLs in the response
+    - NO explanatory text
+    - NO "N/A" mentions in the middle of response
+    - If information is not found, return ONLY 'N/A'
+    - Be concise and factual
+    
     EXTRACTED INFORMATION:
     """
     
     try:
         response = llm_groq.invoke([
-            SystemMessage(content="You are a precise information extraction agent. Extract only facts found in the research. Return 'N/A' if information is not available. NEVER add explanatory text."),
+            SystemMessage(content="You are a strict information extraction agent. Extract ONLY the requested facts. NEVER include URLs, explanations, or additional text. Return 'N/A' if information is not available."),
             HumanMessage(content=prompt)
         ]).content.strip()
         
@@ -385,20 +450,12 @@ def dynamic_extract_field_with_sources(company_name: str, field_name: str, searc
             len(response) < 3):
             return "N/A"
         
-        # Clean the response
-        response = clean_text_content(response)
-        
-        # Special handling for URL fields (except LinkedIn which is handled separately)
-        if field_name in ['company_website_url']:
-            response = clean_and_format_url(response)
-            return response  # No sources for company website URL
+        # Apply field-specific cleaning
+        response = extract_clean_field_data(field_name, response)
         
         # For industry category, return just the data without sources
         if field_name == 'industry_category':
             return response
-        
-        # Limit response length
-        response = response[:250].strip()
         
         # Add source URLs if we have valid information (for all other fields)
         if unique_urls and response != "N/A":
@@ -419,17 +476,15 @@ def generate_dynamic_relevance_analysis(company_data: Dict, company_name: str, a
     context_lines = []
     for field, value in company_data.items():
         if value and value != "N/A" and field not in ["why_relevant_to_syntel_bullets", "intent_scoring_level"]:
-            context_lines.append(f"{field}: {value}")
+            # Clean the value for context
+            clean_value = re.sub(r'\[Sources?:[^\]]+\]', '', value).strip()
+            if clean_value and clean_value != "N/A":
+                context_lines.append(f"{field}: {clean_value}")
     
     context = "\n".join(context_lines)
     
-    # Get unique source URLs for credibility
-    unique_urls = list(set([result['url'] for result in all_search_results if result.get('url')]))[:3]
-    source_context = f"Research sources: {', '.join(unique_urls)}" if unique_urls else "Based on comprehensive research"
-    
     relevance_prompt = f"""
     COMPANY: {company_name}
-    {source_context}
     
     COMPANY DATA:
     {context}
@@ -592,15 +647,6 @@ def format_concise_display_with_sources(company_input: str, data_dict: dict) -> 
         else:
             value = data_dict.get(data_field, "N/A")
         
-        # Clean the value
-        if value != "N/A":
-            # Remove extraction prefixes and clean text
-            value = clean_text_content(str(value))
-            
-            # Clean URLs specifically
-            if display_col in ["LinkedIn URL", "Company Website URL"]:
-                value = clean_and_format_url(value)
-        
         # For the three specific fields, return only the data without sources
         if display_col in ["LinkedIn URL", "Company Website URL", "Industry Category"]:
             data_list.append({"Column Header": display_col, "Value": str(value)})
@@ -681,7 +727,7 @@ with st.expander("🚀 Dynamic Research Approach", expanded=True):
 # Input section
 col1, col2 = st.columns([2, 1])
 with col1:
-    company_input = st.text_input("Enter the company name to research:", "Snowman Logistics")
+    company_input = st.text_input("Enter the company name to research:", "Neuberg Diagnostics")
 with col2:
     with st.form("research_form"):
         submitted = st.form_submit_button("🚀 Start Dynamic Research", type="primary")
