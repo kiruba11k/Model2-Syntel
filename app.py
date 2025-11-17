@@ -44,10 +44,9 @@ REQUIRED_FIELDS = [
     "why_relevant_to_syntel_bullets", "intent_scoring_level"
 ]
 
-# --- Core Functions (Unchanged from previous final version) ---
+# --- Core Functions ---
 
 def clean_and_format_url(url: str) -> str:
-    # ... (function body omitted for brevity, it remains unchanged) ...
     if not url or url == "N/A":
         return "N/A"
     if url.startswith('//'):
@@ -57,7 +56,6 @@ def clean_and_format_url(url: str) -> str:
     return url.replace(' ', '').strip()
 
 def generate_dynamic_search_queries(company_name: str, field_name: str) -> List[str]:
-    # ... (function body omitted for brevity, it remains unchanged) ...
     field_queries = {
         "linkedin_url": [f'"{company_name}" LinkedIn company page'],
         "company_website_url": [f'"{company_name}" official website'],
@@ -69,7 +67,8 @@ def generate_dynamic_search_queries(company_name: str, field_name: str) -> List[
         "expansion_news_12mo": [f'"{company_name}" expansion news 2024 2025 new facilities',f'"{company_name}" new warehouse construction Q3 Q4 2025',],
         "digital_transformation_initiatives": [f'"{company_name}" digital transformation IT initiatives'],
         "it_leadership_change": [f'"{company_name}" CIO CTO IT leadership'],
-        "existing_network_vendors": [f'"{company_name}" technology vendors Cisco VMware SAP Oracle'],
+        # MODIFIED: Focus on Network/Infrastructure Vendors
+        "existing_network_vendors": [f'"{company_name}" network infrastructure vendors Cisco HPE', f'"{company_name}" technology stack'],
         "wifi_lan_tender_found": [f'"{company_name}" WiFi LAN tender network upgrade'],
         "iot_automation_edge_integration": [f'"{company_name}" IoT automation robotics implementation'],
         "cloud_adoption_gcc_setup": [f'"{company_name}" cloud adoption AWS Azure GCC'],
@@ -79,7 +78,6 @@ def generate_dynamic_search_queries(company_name: str, field_name: str) -> List[
     return field_queries.get(field_name, [f'"{company_name}" {field_name}'])
 
 def dynamic_search_for_field(company_name: str, field_name: str) -> List[Dict]:
-    # ... (function body omitted for brevity, it remains unchanged) ...
     queries = generate_dynamic_search_queries(company_name, field_name)
     all_results = []
     
@@ -105,8 +103,9 @@ def dynamic_search_for_field(company_name: str, field_name: str) -> List[Dict]:
     return all_results
 
 def get_detailed_extraction_prompt(company_name: str, field_name: str, research_context: str) -> str:
-    # ... (function body omitted for brevity, it remains unchanged) ...
+    
     prompts = {
+        # ... (prompts for other fields remain unchanged) ...
         "industry_category": f"""Analyze the research data and provide ONLY the single best-fit, primary industry category for {company_name}.
         RESEARCH DATA: {research_context}
         REQUIREMENTS: - Output ONE single industry/sector (e.g., 'Cold Chain Logistics' or 'Pharmaceutical Manufacturing'). - Start directly with the extracted data.
@@ -163,9 +162,19 @@ def get_detailed_extraction_prompt(company_name: str, field_name: str, research_
         REQUIREMENTS: - Provide name, role, and the change (e.g., 'Sunil Nair stepped down as CEO in Q4 2024, new leadership not yet named.'). - Start directly with the extracted data.
         EXTRACTED LEADERSHIP CHANGE:
         """,
-        "existing_network_vendors": f"""Extract ONLY the key technology and network vendors mentioned for {company_name}.
-        RESEARCH DATA: {research_context}
-        REQUIREMENTS: - List specific vendors (e.g., 'Cisco, VMware, SAP, Microsoft'). - Start directly with the extracted data.
+        # MODIFIED: Focus on HARDWARE/INFRASTRUCTURE VENDORS
+        "existing_network_vendors": f"""
+        Analyze the research data and extract the key **Network Hardware/Infrastructure Vendors** (e.g., Cisco, HPE, Ruckus, Dell) for {company_name}.
+        If network hardware vendors are not found, list the primary cloud/software/monitoring tools found instead, and note the distinction.
+        
+        RESEARCH DATA:
+        {research_context}
+        
+        REQUIREMENTS:
+        - List specific vendors/technologies (e.g., 'Cisco (Network), VMware (Virtualization), SAP (ERP)' or 'AWS, PostgreSQL, Grafana (Software/Cloud Stack)').
+        - **DO NOT CUT ANY WORDS OR SOURCE LINKS IN THE MIDDLE OF THE OUTPUT.**
+        - Start directly with the extracted data.
+        
         EXTRACTED VENDORS:
         """,
         "wifi_lan_tender_found": f"""Extract ONLY specific information about any Wi-Fi/LAN or network tender/project found for {company_name}.
@@ -173,14 +182,32 @@ def get_detailed_extraction_prompt(company_name: str, field_name: str, research_
         REQUIREMENTS: - Provide details of the tender/project (e.g., 'RFP for WAN upgrade in Q3 2025' or 'No specific tender found.'). - Start directly with the extracted data.
         EXTRACTED TENDER INFORMATION:
         """,
-        "iot_automation_edge_integration": f"""Extract ONLY the key IoT, Automation, and Edge computing implementations for {company_name}.
-        RESEARCH DATA: {research_context}
-        REQUIREMENTS: - Specify technologies and use cases (e.g., 'IoT for temp checks on blood samples, remote monitoring system with ECIL'). - Start directly with the extracted data.
+        # MODIFIED: Emphasize NO TRUNCATION
+        "iot_automation_edge_integration": f"""
+        Extract ONLY the key IoT, Automation, and Edge computing implementations for {company_name}.
+        
+        RESEARCH DATA:
+        {research_context}
+        
+        REQUIREMENTS:
+        - Specify technologies and use cases (e.g., 'IoT for temp checks on blood samples, remote monitoring system with ECIL').
+        - **DO NOT CUT ANY WORDS OR SOURCE LINKS IN THE MIDDLE OF THE OUTPUT.**
+        - Start directly with the extracted data.
+        
         EXTRACTED IOT/AUTOMATION DETAILS:
         """,
-        "cloud_adoption_gcc_setup": f"""Extract ONLY the key Cloud Adoption or Global Capability Center (GCC) setup details for {company_name}.
-        RESEARCH DATA: {research_context}
-        REQUIREMENTS: - Specify cloud providers, migration status, or GCC plans (e.g., 'Hybrid Cloud model with Azure, no GCC plans found.'). - Start directly with the extracted data.
+        # MODIFIED: Emphasize NO TRUNCATION
+        "cloud_adoption_gcc_setup": f"""
+        Extract ONLY the key Cloud Adoption or Global Capability Center (GCC) setup details for {company_name}.
+        
+        RESEARCH DATA:
+        {research_context}
+        
+        REQUIREMENTS:
+        - Specify cloud providers, migration status, or GCC plans (e.g., 'Hybrid Cloud model with Azure, no GCC plans found.').
+        - **DO NOT CUT ANY WORDS OR SOURCE LINKS IN THE MIDDLE OF THE OUTPUT.**
+        - Start directly with the extracted data.
+        
         EXTRACTED CLOUD/GCC DETAILS:
         """,
         "physical_infrastructure_signals": f"""Extract ONLY the key physical infrastructure developments for {company_name}.
@@ -194,6 +221,7 @@ def get_detailed_extraction_prompt(company_name: str, field_name: str, research_
         EXTRACTED IT BUDGET INFORMATION:
         """
     }
+    
     return prompts.get(field_name, f"""
     Extract ONLY the comprehensive, short, and correct information about {field_name} for {company_name}.
     
@@ -204,10 +232,11 @@ def get_detailed_extraction_prompt(company_name: str, field_name: str, research_
     """)
 
 def dynamic_extract_field_with_sources(company_name: str, field_name: str, search_results: List[Dict]) -> str:
-    # ... (function body omitted for brevity, it remains unchanged) ...
+    
     if not search_results:
         return "N/A"
     
+    # ... (URL handling logic remains unchanged) ...
     if field_name == "linkedin_url":
         for result in search_results:
             url = result.get('url', '')
@@ -234,7 +263,7 @@ def dynamic_extract_field_with_sources(company_name: str, field_name: str, searc
     try:
         response = llm_groq.invoke([
             SystemMessage(content=f"""You are an expert research analyst. Extract FACTUAL DATA ONLY from the provided research context for {company_name}.
-            **The output must be EXTREMELY CONCISE, FACTUAL, and SHORT (under 100 words, unless it's a bulleted list like relevance/expansion).**
+            **The output must be FACTUAL and concise, adhering strictly to the prompt's instructions (especially regarding NO TRUNCATION).**
             **DO NOT** use any introductory phrases, conversational fillers, or descriptive headers.
             Start the output directly with the correct data point. Omit source mentions from the main text body."""),
             HumanMessage(content=prompt)
@@ -261,23 +290,26 @@ def dynamic_extract_field_with_sources(company_name: str, field_name: str, searc
             response = re.sub(r'\s*\d+\s*', '', response).strip() 
             response = response.replace("India India", "India").strip() 
         
-        response = re.sub(r'https?://\S+', '', response)
+        # NOTE: We skip URL removal here for the fields where we want the source to potentially be embedded.
+        
+        # Final Cleaning for general spacing/markdown
         response = re.sub(r'\n+', ' ', response).strip() 
         response = re.sub(r'\s+', ' ', response) 
         response = response.replace("**", "").replace("*", "") 
         
-        if field_name not in ["linkedin_url", "company_website_url"]:
+        # Add sources only if they haven't been incorporated by the LLM (and for non-URL fields)
+        if field_name not in ["linkedin_url", "company_website_url", "existing_network_vendors", "iot_automation_edge_integration", "cloud_adoption_gcc_setup"]:
             if unique_urls and response != "N/A":
                 source_text = f" [Sources: {', '.join(unique_urls[:2])}]" if len(unique_urls) > 1 else f" [Source: {unique_urls[0]}]"
                 response += source_text
         
-        return response[:500]
+        # CRITICAL: We still enforce a character limit due to UI/database constraints, but the LLM is instructed to maximize content first.
+        return response[:500] 
             
     except Exception as e:
         return "N/A"
 
-
-# --- DEDICATED RELEVANCE FUNCTION (REPLACES OLD ONE) ---
+# --- DEDICATED RELEVANCE FUNCTION (UNCHANGED) ---
 
 def syntel_relevance_analysis_v2(company_data: Dict, company_name: str) -> tuple:
     """
@@ -343,30 +375,25 @@ def syntel_relevance_analysis_v2(company_data: Dict, company_name: str) -> tuple
         if len(parts) == 3:
             company, relevance_text, score = parts
             
-            # Clean and format the relevance text into the desired bullet format
             bullets = relevance_text.split('\n')
             
-            # Use a robust cleaning for the bullets
             cleaned_bullets = []
             for bullet in bullets:
                 clean_bullet = re.sub(r'^[•\-\s]*', '• ', bullet.strip())
                 clean_bullet = re.sub(r'\*\*|\*|__|_', '', clean_bullet)
-                if len(clean_bullet) > 5: # Ensure it's not empty
+                if len(clean_bullet) > 5:
                     cleaned_bullets.append(clean_bullet)
 
-            # Ensure exactly 3 bullets are returned, padding with a generic one if needed
             while len(cleaned_bullets) < 3:
                  cleaned_bullets.append("• Strategic relevance due to being a target industry.")
             
             formatted_bullets = "\n".join(cleaned_bullets[:3])
             return formatted_bullets, score.strip()
         
-        # Fallback if TSV parsing fails
         raise ValueError("LLM response not in expected TSV format.")
 
     except Exception:
-        # Intelligent Fallback: Construct generic but relevant bullets from existing data
-        
+        # Intelligent Fallback
         fallback_bullets_list = []
         
         # 1. Expansion Signal
@@ -390,7 +417,7 @@ def syntel_relevance_analysis_v2(company_data: Dict, company_name: str) -> tuple
         return "\n".join(fallback_bullets_list), "Medium"
 
 
-# --- Main Research Function (Updated to use V2) ---
+# --- Main Research Function (UNCHANGED) ---
 
 def dynamic_research_company_intelligence(company_name: str) -> Dict[str, Any]:
     """Main function to conduct comprehensive company research"""
@@ -424,14 +451,12 @@ def dynamic_research_company_intelligence(company_name: str) -> Dict[str, Any]:
     progress_bar.progress(90)
     
     try:
-        # --- CRITICAL CHANGE: Use the new V2 function ---
         relevance_bullets, intent_score = syntel_relevance_analysis_v2(
             company_data, company_name
         )
         company_data["why_relevant_to_syntel_bullets"] = relevance_bullets
         company_data["intent_scoring_level"] = intent_score
     except Exception:
-        # This only catches errors in syntel_relevance_analysis_v2 itself, not the LLM call error
         company_data["why_relevant_to_syntel_bullets"] = "• Analysis failure: Check core data points for LLM processing."
         company_data["intent_scoring_level"] = "Medium"
     
@@ -467,7 +492,7 @@ def format_concise_display_with_sources(company_input: str, data_dict: dict) -> 
     df = pd.DataFrame(data_list)
     return df
 
-# --- Streamlit UI (Execution Block - Unchanged) ---
+# --- Streamlit UI (Execution Block - UNCHANGED) ---
 if __name__ == "__main__":
     DEFAULT_COMPANY = "Snowman Logistics"
     
