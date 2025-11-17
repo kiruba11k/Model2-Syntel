@@ -34,7 +34,7 @@ except Exception as e:
     st.error(f"Failed to initialize Groq or Tavily tools: {e}")
     st.stop()
 
-# --- Required Fields Definition (No Change) ---
+# --- Required Fields Definition ---
 REQUIRED_FIELDS = [
     "linkedin_url", "company_website_url", "industry_category", 
     "employee_count_linkedin", "headquarters_location", "revenue_source",
@@ -44,6 +44,136 @@ REQUIRED_FIELDS = [
     "physical_infrastructure_signals", "it_infra_budget_capex",
     "why_relevant_to_syntel_bullets", "intent_scoring_level"
 ]
+
+# --- Enhanced Dynamic Search Queries ---
+def generate_dynamic_search_queries(company_name: str, field_name: str) -> List[str]:
+    """Generate dynamic search queries based on company and field"""
+    
+    field_queries = {
+        "linkedin_url": [
+            f'"{company_name}" LinkedIn company page',
+            f'"{company_name}" LinkedIn official'
+        ],
+        "company_website_url": [
+            f'"{company_name}" official website',
+            f'"{company_name}" company website'
+        ],
+        "industry_category": [
+            f'"{company_name}" industry business sector',
+            f'"{company_name}" type of business'
+        ],
+        "employee_count_linkedin": [
+            f'"{company_name}" employee count LinkedIn',
+            f'"{company_name}" number of employees'
+        ],
+        "headquarters_location": [
+            f'"{company_name}" headquarters location address',
+            f'"{company_name}" corporate headquarters address'
+        ],
+        "revenue_source": [
+            f'"{company_name}" revenue USD dollars financial results',
+            f'"{company_name}" annual revenue income statement',
+            f'"{company_name}" financial results revenue'
+        ],
+        "branch_network_count": [
+            f'"{company_name}" branch network facilities locations count',
+            f'"{company_name}" offices warehouses locations'
+        ],
+        "expansion_news_12mo": [
+            f'"{company_name}" expansion 2024 2025 new facilities',
+            f'"{company_name}" growth expansion news latest'
+        ],
+        "digital_transformation_initiatives": [
+            f'"{company_name}" digital transformation IT initiatives',
+            f'"{company_name}" technology modernization projects'
+        ],
+        "it_leadership_change": [
+            f'"{company_name}" CIO CTO IT leadership',
+            f'"{company_name}" chief information officer technology'
+        ],
+        "existing_network_vendors": [
+            f'"{company_name}" technology vendors Cisco VMware SAP Oracle',
+            f'"{company_name}" IT infrastructure vendors partners'
+        ],
+        "wifi_lan_tender_found": [
+            f'"{company_name}" WiFi LAN tender network upgrade',
+            f'"{company_name}" network infrastructure project'
+        ],
+        "iot_automation_edge_integration": [
+            f'"{company_name}" IoT automation robotics implementation',
+            f'"{company_name}" smart technology implementation'
+        ],
+        "cloud_adoption_gcc_setup": [
+            f'"{company_name}" cloud adoption AWS Azure GCC',
+            f'"{company_name}" cloud migration strategy'
+        ],
+        "physical_infrastructure_signals": [
+            f'"{company_name}" new construction facility expansion',
+            f'"{company_name}" infrastructure development projects'
+        ],
+        "it_infra_budget_capex": [
+            f'"{company_name}" IT budget capex investment technology spending',
+            f'"{company_name}" technology investment budget'
+        ]
+    }
+    
+    return field_queries.get(field_name, [f'"{company_name}" {field_name}'])
+
+# --- Enhanced Search with Multiple Queries ---
+def dynamic_search_for_field(company_name: str, field_name: str) -> List[Dict]:
+    """Dynamic search for specific field information with multiple query attempts"""
+    queries = generate_dynamic_search_queries(company_name, field_name)
+    all_results = []
+    
+    for query in queries[:3]:
+        try:
+            time.sleep(1.2)
+            results = search_tool.invoke({"query": query, "max_results": 3})
+            
+            if isinstance(results, str):
+                continue
+            elif isinstance(results, list):
+                for result in results:
+                    if isinstance(result, dict):
+                        content = result.get('content', '') or result.get('snippet', '')
+                        if len(content) > 50:
+                            all_results.append({
+                                "title": result.get('title', ''),
+                                "content": content[:800],
+                                "url": result.get('url', ''),
+                                "field": field_name,
+                                "query": query
+                            })
+            elif isinstance(results, dict):
+                content = results.get('content', '') or results.get('snippet', '')
+                if len(content) > 50:
+                    all_results.append({
+                        "title": results.get('title', ''),
+                        "content": content[:800],
+                        "url": results.get('url', ''),
+                        "field": field_name,
+                        "query": query
+                    })
+                    
+        except Exception as e:
+            continue
+    
+    return all_results
+
+# --- URL Cleaning Functions ---
+def clean_and_format_url(url: str) -> str:
+    """Clean and format URLs"""
+    if not url or url == "N/A":
+        return "N/A"
+    
+    if url.startswith('//'):
+        url = 'https:' + url
+    elif url.startswith('http://') and '//' in url[7:]:
+        url = url.replace('http://', 'http://').replace('//', '/')
+    elif url.startswith('https://') and '//' in url[8:]:
+        url = url.replace('https://', 'https://').replace('//', '/')
+    
+    return url
 
 # --- Enhanced Extraction Prompts (Headquarters Modified) ---
 def get_detailed_extraction_prompt(company_name: str, field_name: str, research_context: str) -> str:
@@ -88,7 +218,7 @@ def get_detailed_extraction_prompt(company_name: str, field_name: str, research_
         - Start directly with the extracted data.
         
         EXTRACTED HEADQUARTERS LOCATION:
-        """, # <<< MODIFIED HERE
+        """,
         
         "revenue_source": f"""
         Extract ONLY the latest and most relevant annual or quarterly revenue figure for {company_name}. Convert the final number to USD (with period) and provide ONE concise fact.
@@ -116,7 +246,6 @@ def get_detailed_extraction_prompt(company_name: str, field_name: str, research_
         EXTRACTED NETWORK COUNT:
         """,
         
-        # Other prompts remain the same as they require specific lists of facts
         "expansion_news_12mo": f"""
         Extract ONLY the most recent and significant expansion news for {company_name} from the last 12-24 months.
         
@@ -248,7 +377,7 @@ def get_detailed_extraction_prompt(company_name: str, field_name: str, research_
     EXTRACTED INFORMATION:
     """)
 
-# --- CRITICAL MODIFICATION: Enhanced Dynamic Extraction (Cleaning) ---
+# --- Enhanced Dynamic Extraction (Cleaning) ---
 def dynamic_extract_field_with_sources(company_name: str, field_name: str, search_results: List[Dict]) -> str:
     """Enhanced extraction with better source utilization and accuracy"""
     
@@ -320,12 +449,15 @@ def dynamic_extract_field_with_sources(company_name: str, field_name: str, searc
             # Strip out street/zip details if they remain, keeping only location and country
             # This is a fallback if the LLM ignores the prompt
             response_parts = response.split(',')
-            # Keep the last 3 parts (City, State/Province, Country) and join them
+            # Keep the last 3 parts (City, State/Province, Country) or fewer if elements are missing
             if len(response_parts) > 3:
                 response = ", ".join(response_parts[-3:]).strip()
             response = re.sub(r'\s+', ' ', response).strip()
-            return response.replace("India India", "India") # Clean up potential duplication
-
+            # Final quick clean
+            response = re.sub(r'\s*\d+\s*', '', response).strip() # Remove any remaining numbers/zip codes
+            response = response.replace("India India", "India").strip() 
+        # ---------------------------------------------
+            
         # Final Cleaning for all other fields
         response = re.sub(r'https?://\S+', '', response)  # Remove stray URLs
         response = re.sub(r'\n+', ' ', response).strip() 
@@ -342,58 +474,6 @@ def dynamic_extract_field_with_sources(company_name: str, field_name: str, searc
             
     except Exception as e:
         return "N/A"
-
-# --- Main Research Function and UI (No Change) ---
-
-def dynamic_research_company_intelligence(company_name: str) -> Dict[str, Any]:
-    """Main function to conduct comprehensive company research"""
-    
-    company_data = {}
-    all_search_results = []
-    
-    # Research each field with enhanced coverage
-    total_fields = len(REQUIRED_FIELDS) - 2
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-    
-    for i, field in enumerate(REQUIRED_FIELDS[:-2]):
-        progress = (i / total_fields) * 80
-        progress_bar.progress(int(progress))
-        status_text.info(f"🔍 Researching {field.replace('_', ' ').title()} for {company_name}...")
-        
-        try:
-            # Enhanced search with multiple queries
-            search_results = dynamic_search_for_field(company_name, field)
-            all_search_results.extend(search_results)
-            
-            # Comprehensive extraction
-            field_data = dynamic_extract_field_with_sources(company_name, field, search_results)
-            company_data[field] = field_data
-            
-            time.sleep(1.2)
-            
-        except Exception as e:
-            company_data[field] = "N/A"
-            continue
-    
-    # Generate comprehensive relevance analysis
-    status_text.info("🤔 Conducting strategic relevance analysis...")
-    progress_bar.progress(90)
-    
-    try:
-        relevance_bullets, intent_score = generate_dynamic_relevance_analysis(
-            company_data, company_name, all_search_results
-        )
-        company_data["why_relevant_to_syntel_bullets"] = relevance_bullets
-        company_data["intent_scoring_level"] = intent_score
-    except Exception as e:
-        company_data["why_relevant_to_syntel_bullets"] = "• Comprehensive analysis in progress based on company growth and technology initiatives"
-        company_data["intent_scoring_level"] = "Medium"
-    
-    progress_bar.progress(100)
-    status_text.success("✅ Comprehensive research complete!")
-    
-    return company_data
 
 # --- Relevance Analysis and Display Functions (No Change) ---
 def generate_dynamic_relevance_analysis(company_data: Dict, company_name: str, all_search_results: List[Dict]) -> tuple:
@@ -536,23 +616,39 @@ def format_concise_display_with_sources(company_input: str, data_dict: dict) -> 
 
 # --- Streamlit UI (Standard Structure) ---
 if __name__ == "__main__":
+    # --- CRITICAL MODIFICATION: Auto-Execution Setup ---
+    DEFAULT_COMPANY = "Snowman Logistics"
+    
     st.title("🤖 Dynamic Company Intelligence Generator")
     st.sidebar.header("Configuration")
     
     # Input field
-    company_name = st.sidebar.text_input("Enter Company Name to Research:", "Neuberg Diagnostics")
+    company_name = st.sidebar.text_input("Enter Company Name to Research:", DEFAULT_COMPANY)
     
-    # Research button
-    if st.sidebar.button("Run Comprehensive Research"):
-        if company_name:
-            st.session_state['company_name'] = company_name
-            st.session_state['company_data'] = None
+    # Check if the session state needs initialization or rerun (Streamlit's inherent behavior)
+    if 'company_name' not in st.session_state:
+        st.session_state['company_name'] = DEFAULT_COMPANY
+        st.session_state['company_data'] = None
+
+    # Check for trigger:
+    # 1. Manual button click
+    # 2. Company name changed (auto-trigger search)
+    # 3. Initial load and data is not present
+    
+    trigger_search = st.sidebar.button("Run Comprehensive Research")
+    
+    if trigger_search or (company_name != st.session_state.get('company_name', DEFAULT_COMPANY) and company_name):
+        st.session_state['company_name'] = company_name
+        st.session_state['company_data'] = None
+
+    # Auto-run if data is not present on initial load or after button click/name change
+    if st.session_state['company_data'] is None and st.session_state.get('company_name'):
+        
+        with st.spinner(f"Starting comprehensive research for **{st.session_state['company_name']}**..."):
+            company_data = dynamic_research_company_intelligence(st.session_state['company_name'])
+            st.session_state['company_data'] = company_data
             
-            with st.spinner(f"Starting comprehensive research for **{company_name}**..."):
-                company_data = dynamic_research_company_intelligence(company_name)
-                st.session_state['company_data'] = company_data
-                
-            st.success(f"Research for **{company_name}** completed successfully.")
+        st.success(f"Research for **{st.session_state['company_name']}** completed successfully.")
 
     # Display results
     if 'company_data' in st.session_state and st.session_state['company_data']:
