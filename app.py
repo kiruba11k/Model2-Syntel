@@ -108,7 +108,7 @@ def get_detailed_extraction_prompt(company_name: str, field_name: str, research_
         # ... (prompts for other fields remain unchanged) ...
         "industry_category": f"""Analyze the research data and provide ONLY the single best-fit, primary industry category for {company_name}.
         RESEARCH DATA: {research_context}
-        REQUIREMENTS: - Output ONE single industry/sector (e.g., 'Cold Chain Logistics' or 'Pharmaceutical Manufacturing'). - Start directly with the extracted data.
+        REQUIREMENTS: - Output ONE single industry/sector. - Start directly with the extracted data.
         EXTRACTED PRIMARY INDUSTRY:
         """,
         "employee_count_linkedin": f"""Extract ONLY the single most credible or largest employee count/range for {company_name}. If multiple are found, prioritize the LinkedIn range or the largest confirmed number.
@@ -123,7 +123,7 @@ def get_detailed_extraction_prompt(company_name: str, field_name: str, research_
         """,
         "revenue_source": f"""Extract ONLY the latest and most relevant annual or quarterly revenue figure for {company_name}. Convert the final number to USD (with period) and provide ONE concise fact.
         RESEARCH DATA: {research_context}
-        REQUIREMENTS: - Output ONE single value (e.g., 'USD 19.3 million (FY 2025-26 Est.)' or 'USD 450M Annual Revenue (FY 2024)'). - Start directly with the extracted data.
+        REQUIREMENTS: - Output ONE single value in USD. - Start directly with the extracted data.
         EXTRACTED REVENUE INFORMATION:
         """,
         "branch_network_count": f"""
@@ -133,7 +133,7 @@ def get_detailed_extraction_prompt(company_name: str, field_name: str, research_
         {research_context}
         
         REQUIREMENTS:
-        - Output ONE single, consolidated number and the associated capacity/location count (e.g., '44 warehouses across 21 cities with 1,54,330 pallets' or '542 locations').
+        - Output ONE single, consolidated number and the associated capacity/location count.
         - **Prioritize the most recent (2025/2026) consolidated figure.**
         - Start directly with the extracted data.
         
@@ -146,7 +146,7 @@ def get_detailed_extraction_prompt(company_name: str, field_name: str, research_
         {research_context}
         
         REQUIREMENTS:
-        - List specific new facilities, their capacity (if available), and the operational/announced dates (e.g., 'New 5,900-pallet warehouse in Pune (operational June 2026); facilities in Kolkata and Krishnapatnam opened June 2025.').
+        - List specific new facilities, their capacity (if available), and the operational/announced dates.
         - **Focus strictly on announced/completed projects between late 2024 and Q4 2025.**
         - Start directly with the extracted data.
         
@@ -154,24 +154,24 @@ def get_detailed_extraction_prompt(company_name: str, field_name: str, research_
         """,
         "digital_transformation_initiatives": f"""Extract ONLY the key digital transformation and IT projects for {company_name}.
         RESEARCH DATA: {research_context}
-        REQUIREMENTS: - List specific technologies and projects (e.g., 'SAP S/4HANA Greenfield Implementation (2021), SAP BTP Integration'). - Start directly with the extracted data.
+        REQUIREMENTS: - List specific technologies and projects. - Start directly with the extracted data.
         EXTRACTED DIGITAL INITIATIVES:
         """,
         "it_leadership_change": f"""Extract ONLY the key details of any significant IT leadership change (CIO, CTO, etc.) for {company_name} in the last 24 months.
         RESEARCH DATA: {research_context}
-        REQUIREMENTS: - Provide name, role, and the change (e.g., 'Sunil Nair stepped down as CEO in Q4 2024, new leadership not yet named.'). - Start directly with the extracted data.
+        REQUIREMENTS: - Provide name, role, and the change. - Start directly with the extracted data.
         EXTRACTED LEADERSHIP CHANGE:
         """,
         # MODIFIED: Focus on HARDWARE/INFRASTRUCTURE VENDORS
         "existing_network_vendors": f"""
-        Analyze the research data and extract the key **Network Hardware/Infrastructure Vendors** (e.g., Cisco, HPE, Ruckus, Dell) for {company_name}.
+        Analyze the research data and extract the key **Network Hardware/Infrastructure Vendors** for {company_name}.
         If network hardware vendors are not found, list the primary cloud/software/monitoring tools found instead, and note the distinction.
         
         RESEARCH DATA:
         {research_context}
         
         REQUIREMENTS:
-        - List specific vendors/technologies (e.g., 'Cisco (Network), VMware (Virtualization), SAP (ERP)' or 'AWS, PostgreSQL, Grafana (Software/Cloud Stack)').
+        - List specific vendors/technologies.
         - **DO NOT CUT ANY WORDS OR SOURCE LINKS IN THE MIDDLE OF THE OUTPUT.**
         - Start directly with the extracted data.
         
@@ -179,7 +179,7 @@ def get_detailed_extraction_prompt(company_name: str, field_name: str, research_
         """,
         "wifi_lan_tender_found": f"""Extract ONLY specific information about any Wi-Fi/LAN or network tender/project found for {company_name}.
         RESEARCH DATA: {research_context}
-        REQUIREMENTS: - Provide details of the tender/project (e.g., 'RFP for WAN upgrade in Q3 2025' or 'No specific tender found.'). - Start directly with the extracted data.
+        REQUIREMENTS: - Provide details of the tender/project. - Start directly with the extracted data.
         EXTRACTED TENDER INFORMATION:
         """,
         # MODIFIED: Emphasize NO TRUNCATION
@@ -190,7 +190,7 @@ def get_detailed_extraction_prompt(company_name: str, field_name: str, research_
         {research_context}
         
         REQUIREMENTS:
-        - Specify technologies and use cases (e.g., 'IoT for temp checks on blood samples, remote monitoring system with ECIL').
+        - Specify technologies and use cases.
         - **DO NOT CUT ANY WORDS OR SOURCE LINKS IN THE MIDDLE OF THE OUTPUT.**
         - Start directly with the extracted data.
         
@@ -204,7 +204,7 @@ def get_detailed_extraction_prompt(company_name: str, field_name: str, research_
         {research_context}
         
         REQUIREMENTS:
-        - Specify cloud providers, migration status, or GCC plans (e.g., 'Hybrid Cloud model with Azure, no GCC plans found.').
+        - Specify cloud providers, migration status, or GCC plans .
         - **DO NOT CUT ANY WORDS OR SOURCE LINKS IN THE MIDDLE OF THE OUTPUT.**
         - Start directly with the extracted data.
         
@@ -212,12 +212,12 @@ def get_detailed_extraction_prompt(company_name: str, field_name: str, research_
         """,
         "physical_infrastructure_signals": f"""Extract ONLY the key physical infrastructure developments for {company_name}.
         RESEARCH DATA: {research_context}
-        REQUIREMENTS: - List new construction projects and facility expansions (e.g., 'Ranchi Integrated Diagnostics Centre, JV with Star Imaging in Maharashtra'). - Start directly with the extracted data.
+        REQUIREMENTS: - List new construction projects and facility expansions. - Start directly with the extracted data.
         EXTRACTED INFRASTRUCTURE DEVELOPMENTS:
         """,
         "it_infra_budget_capex": f"""Extract ONLY the specific IT infrastructure budget and capital expenditure information for {company_name}.
         RESEARCH DATA: {research_context}
-        REQUIREMENTS: - Provide specific budget figures, timeframes, or investment focus areas (e.g., 'No figures found, focus on digital transformation and expansion'). - Start directly with the extracted data.
+        REQUIREMENTS: - Provide specific budget figures, timeframes, or investment focus areas. - Start directly with the extracted data.
         EXTRACTED IT BUDGET INFORMATION:
         """
     }
@@ -432,7 +432,7 @@ def dynamic_research_company_intelligence(company_name: str) -> Dict[str, Any]:
     for i, field in enumerate(REQUIRED_FIELDS[:-2]):
         progress = (i / total_fields) * 80
         progress_bar.progress(int(progress))
-        status_text.info(f"🔍 Researching **{field.replace('_', ' ').title()}** for {company_name}...")
+        status_text.info(f" Researching **{field.replace('_', ' ').title()}** for {company_name}...")
         
         try:
             search_results = dynamic_search_for_field(company_name, field)
@@ -447,7 +447,7 @@ def dynamic_research_company_intelligence(company_name: str) -> Dict[str, Any]:
             company_data[field] = "N/A"
             continue
     
-    status_text.info("🤔 Conducting strategic relevance analysis...")
+    status_text.info(" Conducting strategic relevance analysis...")
     progress_bar.progress(90)
     
     try:
@@ -461,7 +461,7 @@ def dynamic_research_company_intelligence(company_name: str) -> Dict[str, Any]:
         company_data["intent_scoring_level"] = "Medium"
     
     progress_bar.progress(100)
-    status_text.success("✅ Comprehensive research complete!")
+    status_text.success(" Comprehensive research complete!")
     
     return company_data
 
@@ -520,7 +520,7 @@ if __name__ == "__main__":
         st.success(f"Research for **{st.session_state['company_name']}** completed successfully.")
 
     if 'company_data' in st.session_state and st.session_state['company_data']:
-        st.header(f"📊 Extracted Intelligence: {st.session_state['company_name']}")
+        st.header(f" Extracted Intelligence: {st.session_state['company_name']}")
         
         df_display = format_concise_display_with_sources(
             st.session_state['company_name'], 
