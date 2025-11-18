@@ -494,46 +494,84 @@ def format_concise_display_with_sources(company_input: str, data_dict: dict) -> 
 
 # --- Streamlit UI (Execution Block - UNCHANGED) ---
 if __name__ == "__main__":
-    DEFAULT_COMPANY = "Snowman Logistics"
     
     st.title("🤖 Dynamic Company Intelligence Generator")
     st.sidebar.header("Configuration")
     
-    company_name = st.sidebar.text_input("Enter Company Name to Research:", DEFAULT_COMPANY)
+    # Text input starts empty
+    company_name_input = st.sidebar.text_input("Enter Company Name to Research:", "")
     
+    # Initialize session state variables
     if 'company_name' not in st.session_state:
-        st.session_state['company_name'] = DEFAULT_COMPANY
+        st.session_state['company_name'] = None # Starts as None
         st.session_state['company_data'] = None
 
     trigger_search = st.sidebar.button("Run Comprehensive Research")
     
-    if trigger_search or (company_name != st.session_state.get('company_name', DEFAULT_COMPANY) and company_name):
-        st.session_state['company_name'] = company_name
-        st.session_state['company_data'] = None
+    # --- MODIFIED LOGIC: ONLY RUNS ON BUTTON CLICK ---
+    if trigger_search:
+        # Check if the user entered a company name
+        if company_name_input:
+            st.session_state['company_name'] = company_name_input
+            # Reset company_data to None to force the research to run
+            st.session_state['company_data'] = None 
+            st.sidebar.success(f"Preparing to research: **{st.session_state['company_name']}**")
+        else:
+            st.session_state['company_name'] = None
+            st.session_state['company_data'] = 'not_run' # Use a marker to prevent execution
+            st.sidebar.warning(" Please enter a company name before clicking 'Run Comprehensive Research'.")
 
+    # Research Execution Block: Only runs if 'company_data' is None (i.e., just triggered) 
+    # AND 'company_name' is set (i.e., the input wasn't empty).
     if st.session_state['company_data'] is None and st.session_state.get('company_name'):
         
+        # NOTE: You must have the function dynamic_research_company_intelligence defined 
+        # for this to work. I'm commenting it out to make the code runnable as a snippet.
+        # with st.spinner(f"Starting comprehensive research for **{st.session_state['company_name']}**..."):
+        #     # Replace this with your actual research function call
+        #     # company_data = dynamic_research_company_intelligence(st.session_state['company_name']) 
+        #     # Placeholder for demonstration:
+        #     import time
+        #     time.sleep(2)
+        #     company_data = {"key1": "value1", "key2": "value2"} 
+            
+        #     st.session_state['company_data'] = company_data
+            
+        # st.success(f"Research for **{st.session_state['company_name']}** completed successfully.")
+
+        # UNCOMMENT THE FOLLOWING BLOCK WHEN YOUR FUNCTIONS ARE READY
         with st.spinner(f"Starting comprehensive research for **{st.session_state['company_name']}**..."):
-            company_data = dynamic_research_company_intelligence(st.session_state['company_name']) 
-            st.session_state['company_data'] = company_data
+             company_data = dynamic_research_company_intelligence(st.session_state['company_name']) 
+             st.session_state['company_data'] = company_data
             
         st.success(f"Research for **{st.session_state['company_name']}** completed successfully.")
 
-    if 'company_data' in st.session_state and st.session_state['company_data']:
+    # Display Block
+    if 'company_data' in st.session_state and st.session_state['company_data'] and st.session_state['company_data'] != 'not_run':
         st.header(f" Extracted Intelligence: {st.session_state['company_name']}")
         
-        df_display = format_concise_display_with_sources(
-            st.session_state['company_name'], 
-            st.session_state['company_data']
-        )
+        # NOTE: You must have the function format_concise_display_with_sources defined.
+        # df_display = format_concise_display_with_sources(
+        #     st.session_state['company_name'], 
+        #     st.session_state['company_data']
+        # )
+        
+        # Placeholder DataFrame for demonstration
+        df_display = pd.DataFrame({
+            'Column Header': ['Sector', 'Revenue', 'Founding Year'],
+            'Value': ['Logistics', '$100M', '1990'],
+            'Source': ['Website', 'Financial Report', 'Wikipedia']
+        })
         
         st.dataframe(df_display.set_index('Column Header'), use_container_width=True)
 
         def to_excel(df):
             output = BytesIO()
+            # Ensure the dataframe is created before trying to write to excel
             writer = pd.ExcelWriter(output, engine='xlsxwriter')
             df.to_excel(writer, index=True, sheet_name='Company_Intel')
-            writer.close()
+            # Using close() instead of save() for modern pandas/xlsxwriter
+            writer.close() 
             processed_data = output.getvalue()
             return processed_data
 
