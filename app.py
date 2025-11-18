@@ -432,7 +432,7 @@ def dynamic_research_company_intelligence(company_name: str) -> Dict[str, Any]:
     for i, field in enumerate(REQUIRED_FIELDS[:-2]):
         progress = (i / total_fields) * 80
         progress_bar.progress(int(progress))
-        status_text.info(f"🔍 Researching **{field.replace('_', ' ').title()}** for {company_name}...")
+        status_text.info(f" Researching **{field.replace('_', ' ').title()}** for {company_name}...")
         
         try:
             search_results = dynamic_search_for_field(company_name, field)
@@ -447,7 +447,7 @@ def dynamic_research_company_intelligence(company_name: str) -> Dict[str, Any]:
             company_data[field] = "N/A"
             continue
     
-    status_text.info("🤔 Conducting strategic relevance analysis...")
+    status_text.info(" Conducting strategic relevance analysis...")
     progress_bar.progress(90)
     
     try:
@@ -461,7 +461,7 @@ def dynamic_research_company_intelligence(company_name: str) -> Dict[str, Any]:
         company_data["intent_scoring_level"] = "Medium"
     
     progress_bar.progress(100)
-    status_text.success("✅ Comprehensive research complete!")
+    status_text.success(" Comprehensive research complete!")
     
     return company_data
 
@@ -496,7 +496,7 @@ def format_concise_display_with_sources(company_input: str, data_dict: dict) -> 
 if __name__ == "__main__":
     # Removed DEFAULT_COMPANY = "Snowman Logistics"
     
-    st.title("🤖 Dynamic Company Intelligence Generator")
+    st.title(" Dynamic Company Intelligence Generator")
     st.sidebar.header("Configuration")
     
     # MODIFICATION 1: Removed default company
