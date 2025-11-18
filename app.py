@@ -44,7 +44,7 @@ REQUIRED_FIELDS = [
     "why_relevant_to_syntel_bullets", "intent_scoring_level"
 ]
 
-# --- Core Functions (Extraction, Search, and Relevance) ---
+# --- Core Functions ---
 
 def clean_and_format_url(url: str) -> str:
     if not url or url == "N/A":
@@ -67,6 +67,7 @@ def generate_dynamic_search_queries(company_name: str, field_name: str) -> List[
         "expansion_news_12mo": [f'"{company_name}" expansion news 2024 2025 new facilities',f'"{company_name}" new warehouse construction Q3 Q4 2025',],
         "digital_transformation_initiatives": [f'"{company_name}" digital transformation IT initiatives'],
         "it_leadership_change": [f'"{company_name}" CIO CTO IT leadership'],
+        # MODIFIED: Focus on Network/Infrastructure Vendors
         "existing_network_vendors": [f'"{company_name}" network infrastructure vendors Cisco HPE', f'"{company_name}" technology stack'],
         "wifi_lan_tender_found": [f'"{company_name}" WiFi LAN tender network upgrade'],
         "iot_automation_edge_integration": [f'"{company_name}" IoT automation robotics implementation'],
@@ -104,6 +105,7 @@ def dynamic_search_for_field(company_name: str, field_name: str) -> List[Dict]:
 def get_detailed_extraction_prompt(company_name: str, field_name: str, research_context: str) -> str:
     
     prompts = {
+        # ... (prompts for other fields remain unchanged) ...
         "industry_category": f"""Analyze the research data and provide ONLY the single best-fit, primary industry category for {company_name}.
         RESEARCH DATA: {research_context}
         REQUIREMENTS: - Output ONE single industry/sector (e.g., 'Cold Chain Logistics' or 'Pharmaceutical Manufacturing'). - Start directly with the extracted data.
@@ -160,6 +162,7 @@ def get_detailed_extraction_prompt(company_name: str, field_name: str, research_
         REQUIREMENTS: - Provide name, role, and the change (e.g., 'Sunil Nair stepped down as CEO in Q4 2024, new leadership not yet named.'). - Start directly with the extracted data.
         EXTRACTED LEADERSHIP CHANGE:
         """,
+        # MODIFIED: Focus on HARDWARE/INFRASTRUCTURE VENDORS
         "existing_network_vendors": f"""
         Analyze the research data and extract the key **Network Hardware/Infrastructure Vendors** (e.g., Cisco, HPE, Ruckus, Dell) for {company_name}.
         If network hardware vendors are not found, list the primary cloud/software/monitoring tools found instead, and note the distinction.
@@ -179,6 +182,7 @@ def get_detailed_extraction_prompt(company_name: str, field_name: str, research_
         REQUIREMENTS: - Provide details of the tender/project (e.g., 'RFP for WAN upgrade in Q3 2025' or 'No specific tender found.'). - Start directly with the extracted data.
         EXTRACTED TENDER INFORMATION:
         """,
+        # MODIFIED: Emphasize NO TRUNCATION
         "iot_automation_edge_integration": f"""
         Extract ONLY the key IoT, Automation, and Edge computing implementations for {company_name}.
         
@@ -192,6 +196,7 @@ def get_detailed_extraction_prompt(company_name: str, field_name: str, research_
         
         EXTRACTED IOT/AUTOMATION DETAILS:
         """,
+        # MODIFIED: Emphasize NO TRUNCATION
         "cloud_adoption_gcc_setup": f"""
         Extract ONLY the key Cloud Adoption or Global Capability Center (GCC) setup details for {company_name}.
         
@@ -231,6 +236,7 @@ def dynamic_extract_field_with_sources(company_name: str, field_name: str, searc
     if not search_results:
         return "N/A"
     
+    # ... (URL handling logic remains unchanged) ...
     if field_name == "linkedin_url":
         for result in search_results:
             url = result.get('url', '')
@@ -284,22 +290,34 @@ def dynamic_extract_field_with_sources(company_name: str, field_name: str, searc
             response = re.sub(r'\s*\d+\s*', '', response).strip() 
             response = response.replace("India India", "India").strip() 
         
+        # NOTE: We skip URL removal here for the fields where we want the source to potentially be embedded.
+        
+        # Final Cleaning for general spacing/markdown
         response = re.sub(r'\n+', ' ', response).strip() 
         response = re.sub(r'\s+', ' ', response) 
         response = response.replace("**", "").replace("*", "") 
         
+        # Add sources only if they haven't been incorporated by the LLM (and for non-URL fields)
         if field_name not in ["linkedin_url", "company_website_url", "existing_network_vendors", "iot_automation_edge_integration", "cloud_adoption_gcc_setup"]:
             if unique_urls and response != "N/A":
                 source_text = f" [Sources: {', '.join(unique_urls[:2])}]" if len(unique_urls) > 1 else f" [Source: {unique_urls[0]}]"
                 response += source_text
         
+        # CRITICAL: We still enforce a character limit due to UI/database constraints, but the LLM is instructed to maximize content first.
         return response[:500] 
             
     except Exception as e:
         return "N/A"
 
+# --- DEDICATED RELEVANCE FUNCTION (UNCHANGED) ---
+
 def syntel_relevance_analysis_v2(company_data: Dict, company_name: str) -> tuple:
+    """
+    Generates relevance analysis and intent score strictly based on the provided Syntel GTM profile.
+    This function generates the output in the desired TSV format within the LLM.
+    """
     
+    # 1. Prepare data context for the LLM
     context_lines = []
     for field, value in company_data.items():
         if value and value != "N/A" and field not in ["why_relevant_to_syntel_bullets", "intent_scoring_level"]:
@@ -308,6 +326,7 @@ def syntel_relevance_analysis_v2(company_data: Dict, company_name: str) -> tuple
     
     data_context = "\n".join(context_lines)
 
+    # 2. Define the strict GTM prompt
     relevance_prompt = f"""
     You are evaluating whether the company below is relevant to Syntel’s Go-To-Market for Wi-Fi & Network Integration.
     
@@ -344,12 +363,14 @@ def syntel_relevance_analysis_v2(company_data: Dict, company_name: str) -> tuple
     - Ensure the bullets are short and professional.
     """
     
+    # 3. Invoke LLM and parse output
     try:
         response = llm_groq.invoke([
             SystemMessage(content="You are a meticulous GTM analyst. Generate the output *only* in the requested TSV format, following all rules for specificity and score assignment."),
             HumanMessage(content=relevance_prompt)
         ]).content.strip()
         
+        # Robust parsing of the TSV output
         parts = response.split('\t')
         if len(parts) == 3:
             company, relevance_text, score = parts
@@ -372,18 +393,22 @@ def syntel_relevance_analysis_v2(company_data: Dict, company_name: str) -> tuple
         raise ValueError("LLM response not in expected TSV format.")
 
     except Exception:
+        # Intelligent Fallback
         fallback_bullets_list = []
         
+        # 1. Expansion Signal
         if company_data.get('expansion_news_12mo') not in ["N/A", ""]:
              fallback_bullets_list.append(f"• Recent expansion ({company_data['expansion_news_12mo'][:60]}...) signals immediate need for network planning and deployment.")
         else:
-             fallback_bullets_list.append("• Company operates in a large facility sector, a primary target industry for Syntel's network GTM.")
+             fallback_bullets_list.append("• Company operates in the warehouse/logistics sector, a primary target industry for Syntel's network GTM.")
 
+        # 2. Automation/IoT Signal
         if company_data.get('iot_automation_edge_integration') not in ["N/A", ""]:
              fallback_bullets_list.append(f"• IoT/Automation initiatives ({company_data['iot_automation_edge_integration'][:60]}...) require high-performance, seamless Wi-Fi coverage across large facilities.")
         else:
-             fallback_bullets_list.append("• Large physical spaces demand stable, wide-area network coverage, aligning with the Altai differentiation.")
+             fallback_bullets_list.append("• Large facility operation and logistics demands stable, wide-area network coverage, aligning with the Altai differentiation.")
 
+        # 3. Financial/General Signal
         if company_data.get('revenue_source') not in ["N/A", ""]:
              fallback_bullets_list.append(f"• Financial scale ({company_data['revenue_source'][:30]}...) confirms the ICP revenue size, indicating budget availability for infra projects.")
         else:
@@ -391,9 +416,11 @@ def syntel_relevance_analysis_v2(company_data: Dict, company_name: str) -> tuple
 
         return "\n".join(fallback_bullets_list), "Medium"
 
-# --- Main Research Function ---
+
+# --- Main Research Function (UNCHANGED) ---
 
 def dynamic_research_company_intelligence(company_name: str) -> Dict[str, Any]:
+    """Main function to conduct comprehensive company research"""
     
     company_data = {}
     all_search_results = []
@@ -405,7 +432,7 @@ def dynamic_research_company_intelligence(company_name: str) -> Dict[str, Any]:
     for i, field in enumerate(REQUIRED_FIELDS[:-2]):
         progress = (i / total_fields) * 80
         progress_bar.progress(int(progress))
-        status_text.info(f" Researching **{field.replace('_', ' ').title()}** for {company_name}...")
+        status_text.info(f"🔍 Researching **{field.replace('_', ' ').title()}** for {company_name}...")
         
         try:
             search_results = dynamic_search_for_field(company_name, field)
@@ -420,7 +447,7 @@ def dynamic_research_company_intelligence(company_name: str) -> Dict[str, Any]:
             company_data[field] = "N/A"
             continue
     
-    status_text.info(" Conducting strategic relevance analysis...")
+    status_text.info("🤔 Conducting strategic relevance analysis...")
     progress_bar.progress(90)
     
     try:
@@ -434,11 +461,12 @@ def dynamic_research_company_intelligence(company_name: str) -> Dict[str, Any]:
         company_data["intent_scoring_level"] = "Medium"
     
     progress_bar.progress(100)
-    status_text.success(" Comprehensive research complete!")
+    status_text.success("✅ Comprehensive research complete!")
     
     return company_data
 
 def format_concise_display_with_sources(company_input: str, data_dict: dict) -> pd.DataFrame:
+    """Transform data into clean, professional display format"""
     
     mapping = {
         "Company Name": "company_name", "LinkedIn URL": "linkedin_url", "Company Website URL": "company_website_url", 
@@ -464,61 +492,71 @@ def format_concise_display_with_sources(company_input: str, data_dict: dict) -> 
     df = pd.DataFrame(data_list)
     return df
 
-# --- Streamlit UI (Execution Block - MODIFIED) ---
+# --- Streamlit UI (Execution Block - UNCHANGED) ---
 if __name__ == "__main__":
+    # Removed DEFAULT_COMPANY = "Snowman Logistics"
     
-    # Initialize session state for company name and data
-    if 'company_name' not in st.session_state:
-        st.session_state['company_name'] = ""
-    if 'company_data' not in st.session_state:
-        st.session_state['company_data'] = None
-    if 'search_triggered' not in st.session_state:
-        st.session_state['search_triggered'] = False
-
     st.title("🤖 Dynamic Company Intelligence Generator")
     st.sidebar.header("Configuration")
     
-    # 1. Input field for company name (empty by default)
-    company_name_input = st.sidebar.text_input("Enter Company Name to Research:", value=st.session_state['company_name'])
+    # MODIFICATION 1: Removed default company
+    # The key is to use the 'key' argument for st.text_input to capture input on Enter
+    # We use a button to explicitly trigger the search
+    company_name = st.sidebar.text_input(
+        "Enter Company Name to Research:", 
+        value="", # Start with an empty string, no default
+        key="company_input_box",
+        placeholder="e.g., Snowman Logistics"
+    )
     
-    # 2. Search button
-    trigger_search = st.sidebar.button("Run Comprehensive Research")
-    
-    # Logic to trigger search
-    if trigger_search and company_name_input.strip():
-        # Update session state and flag search
-        st.session_state['company_name'] = company_name_input.strip()
-        st.session_state['company_data'] = None  # Clear old data
-        st.session_state['search_triggered'] = True
-    elif trigger_search and not company_name_input.strip():
-        st.sidebar.warning("Please enter a company name to begin the search.")
-        st.session_state['search_triggered'] = False
+    # Initialize session state variables if they don't exist
+    if 'company_name_to_search' not in st.session_state:
+        st.session_state['company_name_to_search'] = None
+    if 'company_data' not in st.session_state:
         st.session_state['company_data'] = None
 
-    # Check if a search was triggered and we need to run the research function
-    if st.session_state['search_triggered'] and st.session_state['company_data'] is None:
+    # This button explicitly triggers the search
+    trigger_search = st.sidebar.button("Run Comprehensive Research")
+    
+    # MODIFICATION 2: Logic to trigger search only on button press or Enter (implied by text_input behavior)
+    # The search is triggered if:
+    # 1. The explicit button is pressed AND the input box has a value.
+    # 2. The user has pressed 'Enter' in the text input, which often triggers the final state update. 
+    #    We check if the *current* input is different from the *last searched* name AND not empty.
+    
+    search_triggered = False
+    
+    if trigger_search and company_name:
+        st.session_state['company_name_to_search'] = company_name
+        st.session_state['company_data'] = None # Clear old data
+        search_triggered = True
+    
+    # Check if a new, non-empty value was just entered/submitted, and run research if it's new.
+    # We're now relying on the button press logic above to be the primary trigger. 
+    # This prevents automatic search on every character change.
+    
+    # Execution Block: Only run research if a search was just triggered OR if data is missing for the current target
+    if st.session_state['company_name_to_search'] and st.session_state['company_data'] is None:
         
-        company_to_search = st.session_state['company_name']
-        
-        with st.spinner(f"Starting comprehensive research for **{company_to_search}**..."):
-            company_data = dynamic_research_company_intelligence(company_to_search) 
+        with st.spinner(f"Starting comprehensive research for **{st.session_state['company_name_to_search']}**..."):
+            company_data = dynamic_research_company_intelligence(st.session_state['company_name_to_search'])  
             st.session_state['company_data'] = company_data
             
-        st.success(f"Research for **{company_to_search}** completed successfully.")
-        st.session_state['search_triggered'] = False # Reset flag
+        st.success(f"Research for **{st.session_state['company_name_to_search']}** completed successfully.")
 
-    # Display results if data exists
-    if st.session_state['company_data']:
-        company_display_name = st.session_state['company_name']
-        st.header(f" Extracted Intelligence: {company_display_name}")
+    # Display Block (Uses st.session_state['company_name_to_search'] for display)
+    if 'company_data' in st.session_state and st.session_state['company_data']:
+        current_company = st.session_state['company_name_to_search']
+        st.header(f" Extracted Intelligence: {current_company}")
         
         df_display = format_concise_display_with_sources(
-            company_display_name, 
+            current_company, 
             st.session_state['company_data']
         )
         
         st.dataframe(df_display.set_index('Column Header'), use_container_width=True)
 
+        # ... (Download button functions remain unchanged) ...
         def to_excel(df):
             output = BytesIO()
             writer = pd.ExcelWriter(output, engine='xlsxwriter')
@@ -531,8 +569,6 @@ if __name__ == "__main__":
         st.download_button(
             label="Download as Excel",
             data=excel_data,
-            file_name=f"{company_display_name}_Intelligence_{datetime.now().strftime('%Y%m%d')}.xlsx",
+            file_name=f"{current_company}_Intelligence_{datetime.now().strftime('%Y%m%d')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-    elif not st.session_state['search_triggered']:
-        st.info(" Enter a company name in the sidebar and click 'Run Comprehensive Research' to begin.")
