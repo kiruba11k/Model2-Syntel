@@ -35,12 +35,10 @@ except Exception as e:
 
 # --- Required Fields Definition ---
 REQUIRED_FIELDS = [
-    "linkedin_url", "company_website_url", "industry_category", 
-    "employee_count_linkedin", "headquarters_location", "revenue_source",
     "branch_network_count", "expansion_news_12mo", "digital_transformation_initiatives",
     "it_leadership_change", "existing_network_vendors", "wifi_lan_tender_found",
     "iot_automation_edge_integration", "cloud_adoption_gcc_setup", 
-    "physical_infrastructure_signals", "it_infra_budget_capex",
+    "physical_infrastructure_signals", "it_infra_budget_capex", "core_intent_analysis",
     "why_relevant_to_syntel_bullets", "intent_scoring_level"
 ]
 
@@ -57,23 +55,39 @@ def clean_and_format_url(url: str) -> str:
 
 def generate_dynamic_search_queries(company_name: str, field_name: str) -> List[str]:
     field_queries = {
-        "linkedin_url": [f'"{company_name}" LinkedIn company page'],
-        "company_website_url": [f'"{company_name}" official website'],
-        "industry_category": [f'"{company_name}" industry business sector'],
-        "employee_count_linkedin": [f'"{company_name}" employee count LinkedIn'],
-        "headquarters_location": [f'"{company_name}" corporate headquarters city country'],
-        "revenue_source": [f'"{company_name}" revenue USD dollars financial results'],
-        "branch_network_count": [f'"{company_name}" latest warehouse facility count pallet capacity 2025',f'"{company_name}" branch network facilities locations count',],
-        "expansion_news_12mo": [f'"{company_name}" expansion news 2024 2025 new facilities',f'"{company_name}" new warehouse construction Q3 Q4 2025',],
-        "digital_transformation_initiatives": [f'"{company_name}" digital transformation IT initiatives'],
-        "it_leadership_change": [f'"{company_name}" CIO CTO IT leadership'],
-        # MODIFIED: Focus on Network/Infrastructure Vendors
-        "existing_network_vendors": [f'"{company_name}" network infrastructure vendors Cisco HPE', f'"{company_name}" technology stack'],
-        "wifi_lan_tender_found": [f'"{company_name}" WiFi LAN tender network upgrade'],
-        "iot_automation_edge_integration": [f'"{company_name}" IoT automation robotics implementation'],
-        "cloud_adoption_gcc_setup": [f'"{company_name}" cloud adoption AWS Azure GCC'],
-        "physical_infrastructure_signals": [f'"{company_name}" new construction facility expansion'],
-        "it_infra_budget_capex": [f'"{company_name}" IT budget capex investment technology spending']
+        "branch_network_count": [
+            f'"{company_name}" branch network facilities locations count',
+            f'"{company_name}" warehouse facility count pallet capacity 2024 2025'
+        ],
+        "expansion_news_12mo": [
+            f'"{company_name}" expansion news 2024 2025 new facilities',
+            f'"{company_name}" new warehouse construction Q3 Q4 2024 2025'
+        ],
+        "digital_transformation_initiatives": [
+            f'"{company_name}" digital transformation IT initiatives 2024'
+        ],
+        "it_leadership_change": [
+            f'"{company_name}" CIO CTO IT infrastructure leadership 2024'
+        ],
+        "existing_network_vendors": [
+            f'"{company_name}" network infrastructure vendors Cisco HPE Aruba',
+            f'"{company_name}" IT technology stack network equipment'
+        ],
+        "wifi_lan_tender_found": [
+            f'"{company_name}" WiFi LAN tender network upgrade 2024'
+        ],
+        "iot_automation_edge_integration": [
+            f'"{company_name}" IoT automation robotics implementation'
+        ],
+        "cloud_adoption_gcc_setup": [
+            f'"{company_name}" cloud adoption AWS Azure GCC setup'
+        ],
+        "physical_infrastructure_signals": [
+            f'"{company_name}" new construction facility expansion'
+        ],
+        "it_infra_budget_capex": [
+            f'"{company_name}" IT budget capex investment technology spending'
+        ]
     }
     return field_queries.get(field_name, [f'"{company_name}" {field_name}'])
 
@@ -105,119 +119,147 @@ def dynamic_search_for_field(company_name: str, field_name: str) -> List[Dict]:
 def get_detailed_extraction_prompt(company_name: str, field_name: str, research_context: str) -> str:
     
     prompts = {
-        # ... (prompts for other fields remain unchanged) ...
-        "industry_category": f"""Analyze the research data and provide ONLY the single best-fit, primary industry category for {company_name}.
-        RESEARCH DATA: {research_context}
-        REQUIREMENTS: - Output ONE single industry/sector (e.g., 'Cold Chain Logistics' or 'Pharmaceutical Manufacturing'). - Start directly with the extracted data.
-        EXTRACTED PRIMARY INDUSTRY:
-        """,
-        "employee_count_linkedin": f"""Extract ONLY the single most credible or largest employee count/range for {company_name}. If multiple are found, prioritize the LinkedIn range or the largest confirmed number.
-        RESEARCH DATA: {research_context}
-        REQUIREMENTS: - Output ONE single value (e.g., '1,001-5,000 employees (LinkedIn)' or '3,500 employees confirmed'). - Start directly with the extracted data.
-        EXTRACTED EMPLOYEE COUNT:
-        """,
-        "headquarters_location": f"""Analyze all sources and identify the single, **official corporate headquarters** for {company_name}. Extract ONLY the **City, State/Province, and Country** of the headquarters.
-        RESEARCH DATA: {research_context}
-        REQUIREMENTS: - Output the location as ONE single concise string (e.g., 'Bengaluru, Karnataka, India' or 'Dallas, Texas, USA'). - Start directly with the extracted data.
-        EXTRACTED HEADQUARTERS LOCATION:
-        """,
-        "revenue_source": f"""Extract ONLY the latest and most relevant annual or quarterly revenue figure for {company_name}. Convert the final number to USD (with period) and provide ONE concise fact.
-        RESEARCH DATA: {research_context}
-        REQUIREMENTS: - Output ONE single value (e.g., 'USD 19.3 million (FY 2025-26 Est.)' or 'USD 450M Annual Revenue (FY 2024)'). - Start directly with the extracted data.
-        EXTRACTED REVENUE INFORMATION:
-        """,
         "branch_network_count": f"""
-        Analyze the research data and extract ONLY the **latest, consolidated total** of physical facilities/warehouses/locations and their capacity/city count for {company_name}.
+        Extract ONLY the factual information about branch network or facilities count for {company_name} from the provided research data.
         
-        RESEARCH DATA:
-        {research_context}
+        RESEARCH DATA: {research_context}
         
         REQUIREMENTS:
-        - Output ONE single, consolidated number and the associated capacity/location count (e.g., '44 warehouses across 21 cities with 1,54,330 pallets' or '542 locations').
-        - **Prioritize the most recent (2025/2026) consolidated figure.**
-        - Start directly with the extracted data.
+        - Extract ONLY numbers and facts explicitly mentioned in the research data
+        - DO NOT invent, estimate, or calculate any numbers
+        - If no specific count is found, state "N/A"
+        - Start directly with the extracted data
         
         EXTRACTED NETWORK COUNT:
         """,
-        "expansion_news_12mo": f"""
-        Extract ONLY the most recent and significant expansion news for {company_name} from the **last 12-24 months (2024 and 2025/2026)**. Consolidate new facilities, geographic expansions, and fleet/capacity additions.
         
-        RESEARCH DATA:
-        {research_context}
+        "expansion_news_12mo": f"""
+        Extract ONLY the factual expansion news for {company_name} from the last 12 months mentioned in the research data.
+        
+        RESEARCH DATA: {research_context}
         
         REQUIREMENTS:
-        - List specific new facilities, their capacity (if available), and the operational/announced dates (e.g., 'New 5,900-pallet warehouse in Pune (operational June 2026); facilities in Kolkata and Krishnapatnam opened June 2025.').
-        - **Focus strictly on announced/completed projects between late 2024 and Q4 2025.**
-        - Start directly with the extracted data.
+        - Extract ONLY specific expansion announcements mentioned in the research
+        - Include dates and locations ONLY if explicitly stated
+        - DO NOT infer or assume any expansions
+        - If no expansion news found, state "N/A"
+        - Start directly with the extracted data
         
         EXTRACTED EXPANSION NEWS:
         """,
-        "digital_transformation_initiatives": f"""Extract ONLY the key digital transformation and IT projects for {company_name}.
-        RESEARCH DATA: {research_context}
-        REQUIREMENTS: - List specific technologies and projects (e.g., 'SAP S/4HANA Greenfield Implementation (2021), SAP BTP Integration'). - Start directly with the extracted data.
-        EXTRACTED DIGITAL INITIATIVES:
-        """,
-        "it_leadership_change": f"""Extract ONLY the key details of any significant IT leadership change (CIO, CTO, etc.) for {company_name} in the last 24 months.
-        RESEARCH DATA: {research_context}
-        REQUIREMENTS: - Provide name, role, and the change (e.g., 'Sunil Nair stepped down as CEO in Q4 2024, new leadership not yet named.'). - Start directly with the extracted data.
-        EXTRACTED LEADERSHIP CHANGE:
-        """,
-        # MODIFIED: Focus on HARDWARE/INFRASTRUCTURE VENDORS
-        "existing_network_vendors": f"""
-        Analyze the research data and extract the key **Network Hardware/Infrastructure Vendors** (e.g., Cisco, HPE, Ruckus, Dell) for {company_name}.
-        If network hardware vendors are not found, list the primary cloud/software/monitoring tools found instead, and note the distinction.
         
-        RESEARCH DATA:
-        {research_context}
+        "digital_transformation_initiatives": f"""
+        Extract ONLY the specific digital transformation initiatives mentioned for {company_name} in the research data.
+        
+        RESEARCH DATA: {research_context}
         
         REQUIREMENTS:
-        - List specific vendors/technologies (e.g., 'Cisco (Network), VMware (Virtualization), SAP (ERP)' or 'AWS, PostgreSQL, Grafana (Software/Cloud Stack)').
-        - **DO NOT CUT ANY WORDS OR SOURCE LINKS IN THE MIDDLE OF THE OUTPUT.**
-        - Start directly with the extracted data.
+        - Extract ONLY initiatives explicitly mentioned
+        - Include specific technologies ONLY if named
+        - DO NOT infer or assume any initiatives
+        - If no initiatives found, state "N/A"
+        - Start directly with the extracted data
+        
+        EXTRACTED DIGITAL INITIATIVES:
+        """,
+        
+        "it_leadership_change": f"""
+        Extract ONLY the specific IT leadership changes (CIO/CTO/Head Infra) mentioned for {company_name} in the research data.
+        
+        RESEARCH DATA: {research_context}
+        
+        REQUIREMENTS:
+        - Extract ONLY changes explicitly mentioned with names and dates
+        - DO NOT infer leadership changes
+        - If no changes found, state "N/A"
+        - Start directly with the extracted data
+        
+        EXTRACTED LEADERSHIP CHANGE:
+        """,
+        
+        "existing_network_vendors": f"""
+        Extract ONLY the specific network vendors and technology stack mentioned for {company_name} in the research data.
+        
+        RESEARCH DATA: {research_context}
+        
+        REQUIREMENTS:
+        - Extract ONLY vendors and technologies explicitly mentioned
+        - DO NOT assume or infer vendors based on industry
+        - If no vendors found, state "N/A"
+        - Start directly with the extracted data
         
         EXTRACTED VENDORS:
         """,
-        "wifi_lan_tender_found": f"""Extract ONLY specific information about any Wi-Fi/LAN or network tender/project found for {company_name}.
-        RESEARCH DATA: {research_context}
-        REQUIREMENTS: - Provide details of the tender/project (e.g., 'RFP for WAN upgrade in Q3 2025' or 'No specific tender found.'). - Start directly with the extracted data.
-        EXTRACTED TENDER INFORMATION:
-        """,
-        # MODIFIED: Emphasize NO TRUNCATION
-        "iot_automation_edge_integration": f"""
-        Extract ONLY the key IoT, Automation, and Edge computing implementations for {company_name}.
         
-        RESEARCH DATA:
-        {research_context}
+        "wifi_lan_tender_found": f"""
+        Extract ONLY specific information about WiFi or LAN tenders/projects mentioned for {company_name} in the research data.
+        
+        RESEARCH DATA: {research_context}
         
         REQUIREMENTS:
-        - Specify technologies and use cases (e.g., 'IoT for temp checks on blood samples, remote monitoring system with ECIL').
-        - **DO NOT CUT ANY WORDS OR SOURCE LINKS IN THE MIDDLE OF THE OUTPUT.**
-        - Start directly with the extracted data.
+        - Extract ONLY specific tenders or upgrades explicitly mentioned
+        - Include details ONLY if provided in research
+        - DO NOT assume network upgrades
+        - If no tenders found, state "N/A"
+        - Start directly with the extracted data
+        
+        EXTRACTED TENDER INFORMATION:
+        """,
+        
+        "iot_automation_edge_integration": f"""
+        Extract ONLY the specific IoT, automation, or edge integration projects mentioned for {company_name} in the research data.
+        
+        RESEARCH DATA: {research_context}
+        
+        REQUIREMENTS:
+        - Extract ONLY specific projects and technologies explicitly mentioned
+        - DO NOT infer IoT usage based on industry
+        - If no IoT projects found, state "N/A"
+        - Start directly with the extracted data
         
         EXTRACTED IOT/AUTOMATION DETAILS:
         """,
-        # MODIFIED: Emphasize NO TRUNCATION
-        "cloud_adoption_gcc_setup": f"""
-        Extract ONLY the key Cloud Adoption or Global Capability Center (GCC) setup details for {company_name}.
         
-        RESEARCH DATA:
-        {research_context}
+        "cloud_adoption_gcc_setup": f"""
+        Extract ONLY the specific cloud adoption or GCC setup details mentioned for {company_name} in the research data.
+        
+        RESEARCH DATA: {research_context}
         
         REQUIREMENTS:
-        - Specify cloud providers, migration status, or GCC plans (e.g., 'Hybrid Cloud model with Azure, no GCC plans found.').
-        - **DO NOT CUT ANY WORDS OR SOURCE LINKS IN THE MIDDLE OF THE OUTPUT.**
-        - Start directly with the extracted data.
+        - Extract ONLY specific cloud providers or GCC plans explicitly mentioned
+        - DO NOT assume cloud adoption
+        - If no cloud/GCC details found, state "N/A"
+        - Start directly with the extracted data
         
         EXTRACTED CLOUD/GCC DETAILS:
         """,
-        "physical_infrastructure_signals": f"""Extract ONLY the key physical infrastructure developments for {company_name}.
+        
+        "physical_infrastructure_signals": f"""
+        Extract ONLY the specific physical infrastructure developments mentioned for {company_name} in the research data.
+        
         RESEARCH DATA: {research_context}
-        REQUIREMENTS: - List new construction projects and facility expansions (e.g., 'Ranchi Integrated Diagnostics Centre, JV with Star Imaging in Maharashtra'). - Start directly with the extracted data.
+        
+        REQUIREMENTS:
+        - Extract ONLY specific construction projects explicitly mentioned
+        - Include locations and details ONLY if provided
+        - DO NOT infer infrastructure projects
+        - If no developments found, state "N/A"
+        - Start directly with the extracted data
+        
         EXTRACTED INFRASTRUCTURE DEVELOPMENTS:
         """,
-        "it_infra_budget_capex": f"""Extract ONLY the specific IT infrastructure budget and capital expenditure information for {company_name}.
+        
+        "it_infra_budget_capex": f"""
+        Extract ONLY the specific IT infrastructure budget or capex information mentioned for {company_name} in the research data.
+        
         RESEARCH DATA: {research_context}
-        REQUIREMENTS: - Provide specific budget figures, timeframes, or investment focus areas (e.g., 'No figures found, focus on digital transformation and expansion'). - Start directly with the extracted data.
+        
+        REQUIREMENTS:
+        - Extract ONLY specific budget figures explicitly mentioned
+        - DO NOT estimate or calculate budgets
+        - If no budget information found, state "N/A"
+        - Start directly with the extracted data
+        
         EXTRACTED IT BUDGET INFORMATION:
         """
     }
@@ -227,29 +269,17 @@ def get_detailed_extraction_prompt(company_name: str, field_name: str, research_
     
     RESEARCH DATA: {research_context}
     
-    REQUIREMENTS: - Output must be short, factual, and extremely concise. - Start directly with the extracted data.
+    REQUIREMENTS: 
+    - Output must be short, factual, and extremely concise. 
+    - Extract ONLY information explicitly mentioned in the research data
+    - DO NOT invent, estimate, or infer any information
+    - Start directly with the extracted data.
     EXTRACTED INFORMATION:
     """)
 
 def dynamic_extract_field_with_sources(company_name: str, field_name: str, search_results: List[Dict]) -> str:
     
     if not search_results:
-        return "N/A"
-    
-    # ... (URL handling logic remains unchanged) ...
-    if field_name == "linkedin_url":
-        for result in search_results:
-            url = result.get('url', '')
-            if 'linkedin.com/company' in url.lower():
-                return clean_and_format_url(url)
-        return "N/A"
-    
-    if field_name == "company_website_url":
-        for result in search_results:
-            url = result.get('url', '')
-            if any(domain in url.lower() for domain in ['.com', '.in', '.org', '.net']):
-                if not any(social in url.lower() for social in ['linkedin', 'facebook', 'twitter', 'youtube', 'slideshare']):
-                    return clean_and_format_url(url)
         return "N/A"
     
     research_context = f"Research data for {company_name} - {field_name}:\n\n"
@@ -263,70 +293,130 @@ def dynamic_extract_field_with_sources(company_name: str, field_name: str, searc
     try:
         response = llm_groq.invoke([
             SystemMessage(content=f"""You are an expert research analyst. Extract FACTUAL DATA ONLY from the provided research context for {company_name}.
-            **The output must be FACTUAL and concise, adhering strictly to the prompt's instructions (especially regarding NO TRUNCATION).**
-            **DO NOT** use any introductory phrases, conversational fillers, or descriptive headers.
-            Start the output directly with the correct data point. Omit source mentions from the main text body."""),
+            **CRITICAL INSTRUCTIONS:**
+            - Extract ONLY information explicitly mentioned in the provided research data
+            - DO NOT use any prior knowledge or make assumptions
+            - DO NOT invent, estimate, or calculate any numbers
+            - If information is not found in the research data, output "N/A"
+            - Start your response directly with the factual data or "N/A"
+            - Be concise and factual"""),
             HumanMessage(content=prompt)
         ]).content.strip()
         
-        if (not response or response.lower() in ['n/a', 'not found', 'no information', 'information not available', ''] or len(response) < 5):
+        # Enhanced validation for hallucination prevention
+        if (not response or 
+            response.lower() in ['n/a', 'not found', 'no information', 'information not available', ''] or 
+            len(response) < 5 or
+            'not mentioned' in response.lower() or
+            'no specific' in response.lower()):
             return "N/A"
         
+        # Clean up any introductory phrases
         clean_up_phrases = [
-            r'^\s*Based on the provided research data,.*:', r'^\s*Here is the extracted information:',
-            r'^\s*Extracted information:', r'^\s*The headquarters address for [A-Za-z\s]+ is:',
-            r'^\s*The official corporate headquarters is located at:', r'^\s*The official corporate headquarters is:',
-            r'^\s*\*\s*', r'^\s*-\s*', r'^\s*\d+\.\s*', 
+            r'^\s*Based on the provided research data,.*:', 
+            r'^\s*Here is the extracted information:',
+            r'^\s*Extracted information:', 
+            r'^\s*The.*for.*is:',
+            r'^\s*\*\s*', 
+            r'^\s*-\s*', 
+            r'^\s*\d+\.\s*', 
         ]
         
         for phrase in clean_up_phrases:
             response = re.sub(phrase, '', response, flags=re.IGNORECASE | re.DOTALL).strip()
 
-        if field_name == "headquarters_location" and response != "N/A":
-            response_parts = response.split(',')
-            if len(response_parts) > 3:
-                response = ", ".join(response_parts[-3:]).strip()
-            response = re.sub(r'\s+', ' ', response).strip()
-            response = re.sub(r'\s*\d+\s*', '', response).strip() 
-            response = response.replace("India India", "India").strip() 
-        
-        # NOTE: We skip URL removal here for the fields where we want the source to potentially be embedded.
-        
-        # Final Cleaning for general spacing/markdown
+        # Final cleaning
         response = re.sub(r'\n+', ' ', response).strip() 
         response = re.sub(r'\s+', ' ', response) 
         response = response.replace("**", "").replace("*", "") 
         
-        # Add sources only if they haven't been incorporated by the LLM (and for non-URL fields)
-        if field_name not in ["linkedin_url", "company_website_url", "existing_network_vendors", "iot_automation_edge_integration", "cloud_adoption_gcc_setup"]:
-            if unique_urls and response != "N/A":
-                source_text = f" [Sources: {', '.join(unique_urls[:2])}]" if len(unique_urls) > 1 else f" [Source: {unique_urls[0]}]"
-                response += source_text
+        # Add sources for traceability
+        if unique_urls and response != "N/A":
+            source_text = f" [Sources: {', '.join(unique_urls[:2])}]" if len(unique_urls) > 1 else f" [Source: {unique_urls[0]}]"
+            response += source_text
         
-        # CRITICAL: We still enforce a character limit due to UI/database constraints, but the LLM is instructed to maximize content first.
         return response[:500] 
             
     except Exception as e:
         return "N/A"
 
-# --- DEDICATED RELEVANCE FUNCTION (UNCHANGED) ---
-
-def syntel_relevance_analysis_v2(company_data: Dict, company_name: str) -> tuple:
+def analyze_core_intent_article(article_url: str, company_name: str) -> str:
     """
-    Generates relevance analysis and intent score strictly based on the provided Syntel GTM profile.
-    This function generates the output in the desired TSV format within the LLM.
+    Analyze the core intent article provided by the user
+    """
+    if not article_url or article_url == "N/A":
+        return "N/A - No article URL provided"
+    
+    try:
+        # Use Tavily to get content from the specific URL
+        search_results = search_tool.invoke({
+            "query": f"site:{article_url}",
+            "max_results": 1,
+            "include_raw_content": True
+        })
+        
+        article_content = ""
+        if search_results and isinstance(search_results, list):
+            for result in search_results:
+                if isinstance(result, dict):
+                    content = result.get('content', '') or result.get('snippet', '')
+                    if content:
+                        article_content = content[:1500]  # Limit content length
+                        break
+        
+        if not article_content:
+            # If Tavily can't fetch, try direct search about the article topic
+            search_results = search_tool.invoke({
+                "query": f'"{company_name}" recent news article',
+                "max_results": 3
+            })
+            
+            article_content = "Research context from recent news:\n"
+            for i, result in enumerate(search_results[:2]):
+                if isinstance(result, dict):
+                    content = result.get('content', '') or result.get('snippet', '')
+                    article_content += f"Source {i+1}: {content}\n\n"
+        
+        prompt = f"""
+        Analyze the following article/content about {company_name} and extract the core business intent or strategic initiative:
+        
+        ARTICLE/CONTENT: {article_content}
+        
+        CORE INTENT ANALYSIS:
+        - What is the main business objective or strategic move described?
+        - What technology or infrastructure needs does this imply?
+        - How does this relate to network/infrastructure requirements?
+        
+        Provide a concise analysis focusing on the strategic intent and implied technology needs.
+        """
+        
+        response = llm_groq.invoke([
+            SystemMessage(content="You are a strategic business analyst. Analyze the core intent from the provided article/content."),
+            HumanMessage(content=prompt)
+        ]).content.strip()
+        
+        return f"{response} [Article: {article_url}]" if response else f"N/A - Could not analyze article [URL: {article_url}]"
+        
+    except Exception as e:
+        return f"N/A - Error analyzing article: {str(e)} [URL: {article_url}]"
+
+# --- DEDICATED RELEVANCE FUNCTION WITH CORE INTENT INTEGRATION ---
+
+def syntel_relevance_analysis_v2(company_data: Dict, company_name: str, core_intent_analysis: str) -> tuple:
+    """
+    Generates relevance analysis and intent score with core intent integration
     """
     
-    # 1. Prepare data context for the LLM
+    # Prepare data context for the LLM
     context_lines = []
     for field, value in company_data.items():
-        if value and value != "N/A" and field not in ["why_relevant_to_syntel_bullets", "intent_scoring_level"]:
+        if value and value != "N/A" and field not in ["why_relevant_to_syntel_bullets", "intent_scoring_level", "core_intent_analysis"]:
             clean_value = re.sub(r'\[Sources?:[^\]]+\]', '', value).strip()
             context_lines.append(f"{field.replace('_', ' ').title()}: {clean_value}")
     
     data_context = "\n".join(context_lines)
 
-    # 2. Define the strict GTM prompt
+    # Enhanced prompt with core intent integration
     relevance_prompt = f"""
     You are evaluating whether the company below is relevant to Syntel's Go-To-Market for Wi-Fi & Network Integration.
     
@@ -343,6 +433,9 @@ def syntel_relevance_analysis_v2(company_data: Dict, company_name: str) -> tuple
     - Leadership changes (CIO/CTO/Infra head)
     - Large physical spaces needing wireless coverage
     
+    **CORE INTENT ANALYSIS:**
+    {core_intent_analysis}
+    
     **Offerings:** Wi-Fi deployments, Network integration & managed services, Multi-vendor implementation (Altai + others), Full implementation support.
     ---
     
@@ -350,23 +443,24 @@ def syntel_relevance_analysis_v2(company_data: Dict, company_name: str) -> tuple
     {data_context}
     
     **TASK:**
-    1. Determine the Intent Score (High / Medium / Low) based *only* on the Buying Signals present in the Company Details.
-    2. Generate a 3-bullet point summary for "Why Relevant to Syntel." The bullets **MUST be specific and directly reference the company's data (e.g., 'New facility construction in Pune signals immediate need for network.')**.
-    3. Output the final result in the exact TSV format specified below.
+    1. Determine the Intent Score (High / Medium / Low) based on Buying Signals AND the Core Intent analysis
+    2. Generate a 3-bullet point summary for "Why Relevant to Syntel." 
+    3. **INTEGRATE THE CORE INTENT** into your analysis where relevant
+    4. Output the final result in the exact TSV format specified below.
     
     **OUTPUT FORMAT (TSV):**
     Company Name\tWhy Relevant to Syntel\tIntent (High / Medium / Low)
     
     **RULES:**
-    - "Why Relevant" must contain the 3 bullet points, separated by a newline.
-    - Do not include headers in the output.
-    - Ensure the bullets are short and professional.
+    - "Why Relevant" must contain the 3 bullet points, separated by a newline
+    - Include core intent insights in your analysis
+    - Do not include headers in the output
+    - Ensure the bullets are short and professional
     """
     
-    # 3. Invoke LLM and parse output
     try:
         response = llm_groq.invoke([
-            SystemMessage(content="You are a meticulous GTM analyst. Generate the output *only* in the requested TSV format, following all rules for specificity and score assignment."),
+            SystemMessage(content="You are a meticulous GTM analyst. Generate the output *only* in the requested TSV format, following all rules for specificity and score assignment. Integrate core intent insights where relevant."),
             HumanMessage(content=relevance_prompt)
         ]).content.strip()
         
@@ -393,44 +487,55 @@ def syntel_relevance_analysis_v2(company_data: Dict, company_name: str) -> tuple
         raise ValueError("LLM response not in expected TSV format.")
 
     except Exception:
-        # Intelligent Fallback
+        # Enhanced fallback with core intent consideration
         fallback_bullets_list = []
         
-        # 1. Expansion Signal
+        # 1. Core Intent Signal
+        if "N/A" not in core_intent_analysis:
+            fallback_bullets_list.append("• Core intent analysis indicates strategic initiatives requiring network infrastructure support.")
+        else:
+            fallback_bullets_list.append("• Company operates in target sectors requiring robust network infrastructure.")
+        
+        # 2. Expansion Signal
         if company_data.get('expansion_news_12mo') not in ["N/A", ""]:
-             fallback_bullets_list.append(f"• Recent expansion ({company_data['expansion_news_12mo'][:60]}...) signals immediate need for network planning and deployment.")
+             fallback_bullets_list.append(f"• Recent expansion signals immediate need for network planning and deployment.")
         else:
-             fallback_bullets_list.append("• Company operates in the warehouse/logistics sector, a primary target industry for Syntel's network GTM.")
+             fallback_bullets_list.append("• Operations in logistics/warehousing sector align with Syntel's network GTM focus.")
 
-        # 2. Automation/IoT Signal
+        # 3. Technology Signal
         if company_data.get('iot_automation_edge_integration') not in ["N/A", ""]:
-             fallback_bullets_list.append(f"• IoT/Automation initiatives ({company_data['iot_automation_edge_integration'][:60]}...) require high-performance, seamless Wi-Fi coverage across large facilities.")
+             fallback_bullets_list.append(f"• IoT/Automation initiatives require high-performance Wi-Fi coverage across facilities.")
         else:
-             fallback_bullets_list.append("• Large facility operation and logistics demands stable, wide-area network coverage, aligning with the Altai differentiation.")
-
-        # 3. Financial/General Signal
-        if company_data.get('revenue_source') not in ["N/A", ""]:
-             fallback_bullets_list.append(f"• Financial scale ({company_data['revenue_source'][:30]}...) confirms the ICP revenue size, indicating budget availability for infra projects.")
-        else:
-             fallback_bullets_list.append("• Company's scale and growth trajectory point to high future capex for IT infrastructure modernization.")
+             fallback_bullets_list.append("• Scale of operations indicates need for reliable, wide-area network coverage.")
 
         return "\n".join(fallback_bullets_list), "Medium"
 
+# --- Main Research Function ---
 
-# --- Main Research Function (UNCHANGED) ---
-
-def dynamic_research_company_intelligence(company_name: str) -> Dict[str, Any]:
+def dynamic_research_company_intelligence(company_name: str, article_url: str = None) -> Dict[str, Any]:
     """Main function to conduct comprehensive company research"""
     
     company_data = {}
     all_search_results = []
     
-    total_fields = len(REQUIRED_FIELDS) - 2
+    total_fields = len(REQUIRED_FIELDS) - 3  # Exclude core_intent_analysis and last two fields
     progress_bar = st.progress(0)
     status_text = st.empty()
     
-    for i, field in enumerate(REQUIRED_FIELDS[:-2]):
-        progress = (i / total_fields) * 80
+    # First, analyze core intent article if provided
+    if article_url:
+        status_text.info(f" Analyzing core intent article for {company_name}...")
+        core_intent = analyze_core_intent_article(article_url, company_name)
+        company_data["core_intent_analysis"] = core_intent
+        progress_bar.progress(10)
+    else:
+        company_data["core_intent_analysis"] = "N/A - No article URL provided"
+    
+    # Research other fields
+    research_fields = [f for f in REQUIRED_FIELDS if f not in ["core_intent_analysis", "why_relevant_to_syntel_bullets", "intent_scoring_level"]]
+    
+    for i, field in enumerate(research_fields):
+        progress = 10 + (i / len(research_fields)) * 70
         progress_bar.progress(int(progress))
         status_text.info(f" Researching **{field.replace('_', ' ').title()}** for {company_name}...")
         
@@ -452,7 +557,7 @@ def dynamic_research_company_intelligence(company_name: str) -> Dict[str, Any]:
     
     try:
         relevance_bullets, intent_score = syntel_relevance_analysis_v2(
-            company_data, company_name
+            company_data, company_name, company_data.get("core_intent_analysis", "N/A")
         )
         company_data["why_relevant_to_syntel_bullets"] = relevance_bullets
         company_data["intent_scoring_level"] = intent_score
@@ -470,22 +575,17 @@ def format_horizontal_display_with_sources(company_input: str, data_dict: dict) 
     
     mapping = {
         "Company Name": "company_name", 
-        "LinkedIn URL": "linkedin_url", 
-        "Company Website URL": "company_website_url", 
-        "Industry Category": "industry_category", 
-        "Employee Count (LinkedIn)": "employee_count_linkedin",
-        "Headquarters (Location)": "headquarters_location", 
-        "Revenue (Source)": "revenue_source",
         "Branch Network / Facilities Count": "branch_network_count", 
         "Expansion News (Last 12 Months)": "expansion_news_12mo",
         "Digital Transformation Initiatives": "digital_transformation_initiatives", 
-        "IT Leadership Change": "it_leadership_change",
-        "Existing Network Vendors": "existing_network_vendors", 
-        "Wi-Fi/LAN Tender Found": "wifi_lan_tender_found",
-        "IoT/Automation/Edge": "iot_automation_edge_integration", 
-        "Cloud Adoption/GCC": "cloud_adoption_gcc_setup",
-        "Physical Infrastructure": "physical_infrastructure_signals", 
-        "IT Infra Budget/Capex": "it_infra_budget_capex",
+        "IT Infrastructure Leadership Change": "it_leadership_change",
+        "Existing Network Vendors / Tech Stack": "existing_network_vendors", 
+        "Recent Wi-Fi Upgrade or LAN Tender Found": "wifi_lan_tender_found",
+        "IoT / Automation / Edge Integration Mentioned": "iot_automation_edge_integration", 
+        "Cloud Adoption / GCC Setup": "cloud_adoption_gcc_setup",
+        "Physical Infrastructure Signals": "physical_infrastructure_signals", 
+        "IT Infra Budget / Capex Allocation": "it_infra_budget_capex",
+        "Core Intent Analysis": "core_intent_analysis",
         "Why Relevant to Syntel": "why_relevant_to_syntel_bullets",
         "Intent Scoring": "intent_scoring_level"
     }
@@ -502,7 +602,7 @@ def format_horizontal_display_with_sources(company_input: str, data_dict: dict) 
     df = pd.DataFrame([row_data])
     return df
 
-# --- Streamlit UI (Execution Block - MODIFIED for horizontal display) ---
+# --- Streamlit UI ---
 if __name__ == "__main__":
     st.title(" Dynamic Company Intelligence Generator")
     st.sidebar.header("Configuration")
@@ -514,11 +614,20 @@ if __name__ == "__main__":
         placeholder="e.g., Snowman Logistics"
     )
     
+    article_url = st.sidebar.text_input(
+        "Core Intent Article URL:",
+        value="",
+        key="article_url_input",
+        placeholder="Paste the article link that prompted this research"
+    )
+    
     # Initialize session state variables if they don't exist
     if 'company_name_to_search' not in st.session_state:
         st.session_state['company_name_to_search'] = None
     if 'company_data' not in st.session_state:
         st.session_state['company_data'] = None
+    if 'article_url' not in st.session_state:
+        st.session_state['article_url'] = None
 
     # This button explicitly triggers the search
     trigger_search = st.sidebar.button("Run Comprehensive Research")
@@ -527,30 +636,33 @@ if __name__ == "__main__":
     
     if trigger_search and company_name:
         st.session_state['company_name_to_search'] = company_name
+        st.session_state['article_url'] = article_url
         st.session_state['company_data'] = None # Clear old data
         search_triggered = True
     
-    # Execution Block: Only run research if a search was just triggered OR if data is missing for the current target
+    # Execution Block
     if st.session_state['company_name_to_search'] and st.session_state['company_data'] is None:
         
         with st.spinner(f"Starting comprehensive research for **{st.session_state['company_name_to_search']}**..."):
-            company_data = dynamic_research_company_intelligence(st.session_state['company_name_to_search'])  
+            company_data = dynamic_research_company_intelligence(
+                st.session_state['company_name_to_search'], 
+                st.session_state['article_url']
+            )  
             st.session_state['company_data'] = company_data
             
         st.success(f"Research for **{st.session_state['company_name_to_search']}** completed successfully.")
 
-    # Display Block (Uses st.session_state['company_name_to_search'] for display)
+    # Display Block
     if 'company_data' in st.session_state and st.session_state['company_data']:
         current_company = st.session_state['company_name_to_search']
         st.header(f" Extracted Intelligence: {current_company}")
         
-        # MODIFIED: Use horizontal format instead of vertical
+        # Display the horizontal dataframe
         df_display = format_horizontal_display_with_sources(
             current_company, 
             st.session_state['company_data']
         )
         
-        # Display the horizontal dataframe
         st.dataframe(df_display, use_container_width=True)
 
         # Download button functions
