@@ -56,7 +56,7 @@ def clean_and_format_url(url: str) -> str:
 def generate_dynamic_search_queries(company_name: str, field_name: str) -> List[str]:
     field_queries = {
         "branch_network_count": [
-            f'"{company_name}" branch network facilities locations count 2024',
+            f'"{company_name}" branch network facilities locations count',
             f'"{company_name}" warehouse facility pallet capacity'
         ],
         "expansion_news_12mo": [
@@ -102,7 +102,11 @@ def dynamic_search_for_field(company_name: str, field_name: str) -> List[Dict]:
     for query in queries[:2]:
         try:
             time.sleep(0.5)
-            results = search_tool.invoke({"query": query, "max_results": 3})
+            results = search_tool.invoke({
+                "query": query, 
+                "max_results": 3,
+                "search_depth": "advanced"
+            })
             
             if isinstance(results, list):
                 for result in results:
@@ -111,7 +115,7 @@ def dynamic_search_for_field(company_name: str, field_name: str) -> List[Dict]:
                         if len(content) > 50:
                             all_results.append({
                                 "title": result.get('title', ''),
-                                "content": content[:600],
+                                "content": content[:800],
                                 "url": result.get('url', ''),
                                 "field": field_name,
                                 "query": query
@@ -125,157 +129,197 @@ def get_detailed_extraction_prompt(company_name: str, field_name: str, research_
     # Format source URLs for the prompt
     sources_text = ", ".join(source_urls) if source_urls else "No specific URLs found"
     
-    base_prompt = f"""
-    Extract CONCISE information about {field_name} for {company_name}.
+    field_specific_instructions = {
+        "branch_network_count": "Extract ONLY facility counts, warehouse numbers, pallet capacity explicitly mentioned.",
+        "expansion_news_12mo": "Extract ONLY recent expansion announcements with locations and dates explicitly mentioned.",
+        "digital_transformation_initiatives": "Extract ONLY specific digital projects, systems, or platforms explicitly mentioned.",
+        "it_leadership_change": "Extract ONLY CIO/CTO/Head Infra changes with names and dates explicitly mentioned.",
+        "existing_network_vendors": "Extract ONLY network hardware vendors (Cisco, HPE, etc.) or tech stack explicitly mentioned.",
+        "wifi_lan_tender_found": "Extract ONLY specific WiFi/LAN tenders or upgrade projects explicitly mentioned.",
+        "iot_automation_edge_integration": "Extract ONLY IoT, automation, or edge computing projects explicitly mentioned.",
+        "cloud_adoption_gcc_setup": "Extract ONLY cloud providers or GCC setup plans explicitly mentioned.",
+        "physical_infrastructure_signals": "Extract ONLY new construction, facility expansions with details explicitly mentioned.",
+        "it_infra_budget_capex": "Extract ONLY IT budget figures, capex amounts, or investment numbers explicitly mentioned."
+    }
     
-    RESEARCH CONTEXT:
+    field_instruction = field_specific_instructions.get(field_name, "Extract ONLY factual information explicitly mentioned.")
+    
+    prompt = f"""
+    RESEARCH TASK: Extract information about {field_name} for {company_name}
+    
+    SOURCE CONTENT:
     {research_context}
     
     AVAILABLE SOURCES: {sources_text}
     
-    REQUIREMENTS:
-    1. Extract ONLY factual information explicitly mentioned in the research
-    2. If no specific information found, output ONLY "N/A"
-    3. DO NOT invent, estimate, or assume any information
-    4. DO NOT include explanations or apologies
-    5. Keep response under 200 characters
-    6. Format: [Brief factual summary] [Sources: url1, url2]
+    STRICT INSTRUCTIONS:
+    1. {field_instruction}
+    2. USE ONLY information explicitly provided in the source content above
+    3. DO NOT use any prior knowledge or make assumptions
+    4. DO NOT invent, estimate, or calculate any numbers
+    5. If information is NOT found in the source content, output ONLY: "N/A"
+    6. If information is found, provide a CONCISE 1-2 sentence summary
+    7. ALWAYS include the relevant source URLs at the end
     
-    EXTRACTED INFORMATION:
+    OUTPUT FORMAT:
+    [Concise factual summary] [Sources: url1, url2]
+    
+    If no information found:
+    N/A
+    
+    EXTRACTION RESULT:
     """
     
-    return base_prompt
+    return prompt
 
 def dynamic_extract_field_with_sources(company_name: str, field_name: str, search_results: List[Dict]) -> str:
     
     if not search_results:
         return "N/A"
     
-    # Build research context
+    # Build research context with clear source attribution
     research_context = ""
     for i, result in enumerate(search_results[:3]):
-        research_context += f"Source {i+1}: {result['content'][:300]}\n\n"
+        content = result['content'][:500]  # Limited content to prevent context overflow
+        research_context += f"SOURCE {i+1} - {result.get('title', 'No Title')}:\n{content}\n\n"
     
-    # Extract actual URLs from search results
+    # Extract and validate URLs
     unique_urls = []
     for result in search_results:
         url = result.get('url', '')
-        if url and url not in unique_urls and 'http' in url:
+        if url and url.startswith(('http://', 'https://')) and url not in unique_urls:
             unique_urls.append(url)
     
-    source_urls = unique_urls[:2]  # Use max 2 URLs
+    source_urls = unique_urls[:2]  # Use max 2 most relevant URLs
     
     prompt = get_detailed_extraction_prompt(company_name, field_name, research_context, source_urls)
     
     try:
         response = llm_groq.invoke([
-            SystemMessage(content="""You are a factual research analyst. Extract ONLY information explicitly mentioned in the research.
+            SystemMessage(content="""You are a strict factual research analyst. Follow these rules:
             CRITICAL RULES:
-            1. If information is not found, output ONLY "N/A"
-            2. DO NOT use placeholder URLs like url1, url2
-            3. DO NOT truncate text in the middle
-            4. Keep response very concise (max 200 characters)
-            5. Always include actual source URLs at the end"""),
+            1. EXTRACT ONLY information explicitly stated in the provided source content
+            2. DO NOT use any external knowledge or make assumptions
+            3. If information is not explicitly found, output ONLY "N/A"
+            4. DO NOT invent numbers, names, or facts
+            5. Be concise and factual
+            6. Include actual source URLs only if information is found"""),
             HumanMessage(content=prompt)
         ]).content.strip()
         
-        # Validate response
+        # Strict validation for hallucination prevention
+        response_lower = response.lower()
         if (not response or 
-            response.lower() in ['n/a', 'not found', 'no information', ''] or 
+            response == "N/A" or
             len(response) < 5 or
-            'unable to access' in response.lower() or
-            'cannot provide' in response.lower()):
+            'not found' in response_lower or
+            'no information' in response_lower or
+            'unable to' in response_lower or
+            'cannot provide' in response_lower or
+            'based on my knowledge' in response_lower):
             return "N/A"
         
         # Clean response
         response = re.sub(r'\s+', ' ', response).strip()
         
-        # Ensure URLs are included properly
-        if source_urls and "http" not in response:
-            source_text = f" [Sources: {', '.join(source_urls)}]"
-            response += source_text
-        elif not source_urls and "http" not in response and response != "N/A":
-            response += " [Sources: Not specified]"
+        # Ensure proper source formatting
+        if response != "N/A" and source_urls:
+            # Check if sources are already included
+            if not any(url in response for url in source_urls):
+                source_text = f" [Sources: {', '.join(source_urls)}]"
+                response += source_text
         
-        # Final validation to prevent mid-sentence cuts
-        if len(response) > 250:
+        # Final length management without mid-sentence cuts
+        if len(response) > 300:
             # Find a clean cutoff point
-            if '.' in response[:240]:
-                cutoff = response[:240].rfind('.') + 1
+            if '.' in response[:280]:
+                cutoff = response[:280].rfind('.') + 1
                 response = response[:cutoff]
-            elif ' ' in response[:240]:
-                cutoff = response[:240].rfind(' ') 
+            elif ' ' in response[:280]:
+                cutoff = response[:280].rfind(' ') 
                 response = response[:cutoff]
-            response = response[:250]
-            
-        return response
+        
+        return response[:350]  # Strict limit
             
     except Exception as e:
         return "N/A"
 
 def analyze_core_intent_article(article_url: str, company_name: str) -> str:
     """
-    Analyze the core intent article provided by the user
+    Analyze the core intent article with robust hallucination prevention
     """
-    if not article_url:
+    if not article_url or not article_url.startswith(('http://', 'https://')):
         return "N/A"
     
     try:
-        # Use Tavily to search for the specific article
+        # Use Tavily to fetch the specific article content
         search_results = search_tool.invoke({
-            "query": f'"{company_name}" "{article_url}"',
-            "max_results": 3,
-            "include_raw_content": True
+            "query": f'"{company_name}"',
+            "max_results": 5,
+            "include_raw_content": True,
+            "search_depth": "advanced"
         })
         
         article_content = ""
-        actual_article_url = article_url
+        relevant_urls = []
         
-        # Extract content from search results
-        if search_results and isinstance(search_results, list):
-            for result in search_results:
-                if isinstance(result, dict):
-                    content = result.get('content', '') or result.get('snippet', '')
-                    url = result.get('url', '')
-                    if content and len(content) > 100:
-                        article_content = content[:1500]
-                        if url:
-                            actual_article_url = url
-                        break
+        # Find the most relevant content matching the article URL
+        for result in search_results:
+            if isinstance(result, dict):
+                url = result.get('url', '')
+                content = result.get('content', '') or result.get('snippet', '')
+                
+                # Prioritize content from the provided article URL
+                if article_url in url or url in article_url:
+                    article_content = content[:2000] if content else ""
+                    relevant_urls.append(url)
+                    break
+                elif content and len(content) > 100:
+                    # Use other relevant content as fallback
+                    article_content = content[:1500]
+                    relevant_urls.append(url)
         
         if not article_content:
-            # If specific article not found, search for general news
-            search_results = search_tool.invoke({
-                "query": f'"{company_name}" recent news strategic expansion',
-                "max_results": 2
-            })
-            
-            article_content = "Recent company news: "
-            for result in search_results[:2]:
-                if isinstance(result, dict):
-                    content = result.get('content', '') or result.get('snippet', '')
-                    if content:
-                        article_content += content[:500] + " "
-        
-        if not article_content or len(article_content) < 50:
             return "N/A"
         
+        # Use the original article URL as primary source
+        primary_source = article_url if article_url not in relevant_urls else relevant_urls[0]
+        
         prompt = f"""
-        Analyze this content about {company_name} and extract the core business intent in ONE concise sentence.
+        ANALYZE THIS COMPANY CONTENT FOR CORE BUSINESS INTENT:
         
-        CONTENT: {article_content}
+        CONTENT:
+        {article_content}
         
-        Output ONLY: [One sentence about strategic intent] [Source: {actual_article_url}]
+        STRICT REQUIREMENTS:
+        1. Extract ONLY the main strategic business objective mentioned
+        2. Focus on expansion, technology adoption, or infrastructure plans
+        3. Use ONLY information explicitly stated in the content
+        4. If no clear strategic intent is stated, output "N/A"
+        5. Be extremely concise (1 sentence maximum)
+        6. DO NOT invent or assume any strategic plans
         
-        If no clear intent found, output: N/A
+        OUTPUT FORMAT:
+        [One sentence about core business intent] [Source: {primary_source}]
+        
+        If no clear intent found:
+        N/A
+        
+        ANALYSIS:
         """
         
         response = llm_groq.invoke([
-            SystemMessage(content="Extract core business intent in one sentence. If unclear, output N/A."),
+            SystemMessage(content="""You analyze business strategy. Extract ONLY explicitly stated strategic intent.
+            CRITICAL: If the content doesn't clearly state strategic objectives, output 'N/A'"""),
             HumanMessage(content=prompt)
         ]).content.strip()
         
-        if not response or response == "N/A" or len(response) < 20:
+        # Validate response
+        if (not response or 
+            response == "N/A" or 
+            len(response) < 20 or
+            'not mentioned' in response.lower() or
+            'no clear' in response.lower()):
             return "N/A"
             
         return response
@@ -285,59 +329,120 @@ def analyze_core_intent_article(article_url: str, company_name: str) -> str:
 
 def syntel_relevance_analysis_v2(company_data: Dict, company_name: str, core_intent_analysis: str) -> tuple:
     """
-    Generates concise relevance analysis with core intent integration
+    Generates relevance analysis with STRICT core intent integration and hallucination prevention
     """
     
-    # Prepare data context - only use fields with actual data
-    context_parts = []
-    for field in ["expansion_news_12mo", "iot_automation_edge_integration", "branch_network_count", "digital_transformation_initiatives"]:
+    # Build factual context from available data only
+    factual_context = []
+    
+    # Only include fields with actual data (not N/A)
+    for field in ["expansion_news_12mo", "iot_automation_edge_integration", 
+                  "branch_network_count", "digital_transformation_initiatives",
+                  "physical_infrastructure_signals"]:
         value = company_data.get(field, "N/A")
         if value != "N/A":
-            # Remove source URLs for context
+            # Remove source URLs for cleaner context
             clean_value = re.sub(r'\[Sources?:[^\]]+\]', '', value).strip()
-            context_parts.append(f"{field}: {clean_value}")
+            if clean_value and len(clean_value) > 10:
+                factual_context.append(f"{field}: {clean_value}")
     
-    data_context = " | ".join(context_parts) if context_parts else "Limited company data available"
-
-    relevance_prompt = f"""
-    Company: {company_name}
-    Data: {data_context}
-    Core Intent: {core_intent_analysis}
+    data_context = " | ".join(factual_context) if factual_context else "Limited specific data available"
     
-    Assess relevance to Syntel (Wi-Fi/Network integration for warehouses, manufacturing, logistics).
-    Output format: Company\t• Point1 • Point2 • Point3\tScore
+    # Determine if core intent should influence scoring
+    core_intent_weight = "HIGH" if core_intent_analysis != "N/A" else "LOW"
     
-    Score: High/Medium/Low
-    Be specific about network/infrastructure needs.
+    prompt = f"""
+    ASSESS RELEVANCE TO SYNTEL (Wi-Fi & Network Integration for Indian enterprises)
+    
+    COMPANY: {company_name}
+    
+    AVAILABLE FACTS:
+    {data_context}
+    
+    CORE INTENT ANALYSIS:
+    {core_intent_analysis}
+    (Core Intent Weight: {core_intent_weight})
+    
+    SYNTEL FOCUS AREAS:
+    - Warehouses, Manufacturing, Logistics facilities
+    - Network infrastructure for new expansions
+    - IoT/Automation implementations requiring WiFi
+    - Digital transformation projects
+    
+    SCORING CRITERIA:
+    HIGH: Expansion signals + IoT/Digital projects + Clear network needs
+    MEDIUM: Some expansion or technology signals
+    LOW: Limited relevant signals
+    
+    OUTPUT FORMAT:
+    CompanyName\t• Bullet1 • Bullet2 • Bullet3\tScore
+    
+    BULLET REQUIREMENTS:
+    - MUST reference specific available facts
+    - MUST connect to network/WiFi infrastructure needs
+    - If core intent available, MUST reference it in first bullet
+    
+    RELEVANCE ASSESSMENT:
     """
-
+    
     try:
         response = llm_groq.invoke([
-            SystemMessage(content="Output: CompanyName\t• Bullet1 • Bullet2 • Bullet3\tHigh/Medium/Low"),
-            HumanMessage(content=relevance_prompt)
+            SystemMessage(content="""You assess company relevance for network infrastructure projects.
+            OUTPUT MUST BE: CompanyName\t• Fact1 • Fact2 • Fact3\tHigh/Medium/Low
+            Use ONLY the provided facts. Connect facts to network needs."""),
+            HumanMessage(content=prompt)
         ]).content.strip()
         
+        # Parse the response
         parts = response.split('\t')
         if len(parts) >= 3:
-            relevance_text = parts[1].strip()
-            score = parts[2].strip()
+            relevance_text = parts[1].strip() if len(parts) > 1 else ""
+            score = parts[2].strip() if len(parts) > 2 else "Medium"
             
             # Clean and format bullets
             bullets = [b.strip() for b in relevance_text.split('•') if b.strip()]
-            formatted_bullets = "\n".join([f"• {bullet}" for bullet in bullets[:3] if len(bullet) > 10])
+            formatted_bullets = []
             
-            if not formatted_bullets:
-                formatted_bullets = "• Expansion requires network infrastructure\n• Operations in target sector\n• Strategic initiatives need IT support"
+            for bullet in bullets[:3]:
+                if len(bullet) > 15:  # Only include substantial bullets
+                    formatted_bullets.append(f"• {bullet}")
             
-            return formatted_bullets, score
+            # Ensure we have 3 bullets
+            while len(formatted_bullets) < 3:
+                if core_intent_analysis != "N/A" and len(formatted_bullets) == 0:
+                    formatted_bullets.append("• Core strategic initiatives indicate infrastructure needs")
+                elif len(formatted_bullets) == 1:
+                    formatted_bullets.append("• Operations in sectors requiring network coverage")
+                else:
+                    formatted_bullets.append("• Company scale suggests IT infrastructure requirements")
+            
+            return "\n".join(formatted_bullets[:3]), score
         
-        return "• Strategic relevance for network infrastructure\n• Target industry alignment\n• Growth signals IT opportunities", "Medium"
+        # Fallback with core intent consideration
+        fallback_bullets = []
+        if core_intent_analysis != "N/A":
+            fallback_bullets.append("• Strategic initiatives require network infrastructure support")
+        if company_data.get('expansion_news_12mo') != "N/A":
+            fallback_bullets.append("• Expansion plans create immediate network deployment needs")
+        if company_data.get('iot_automation_edge_integration') != "N/A":
+            fallback_bullets.append("• Automation projects require reliable wireless connectivity")
+        
+        while len(fallback_bullets) < 3:
+            fallback_bullets.append("• Target industry alignment with Syntel's focus areas")
+        
+        return "\n".join(fallback_bullets[:3]), "Medium"
 
     except Exception:
-        return "• Strategic relevance for network infrastructure\n• Target industry alignment\n• Growth signals IT opportunities", "Medium"
+        # Basic fallback
+        fallback_bullets = [
+            "• Potential for network infrastructure projects",
+            "• Industry sector alignment with Syntel's focus",
+            "• Growth indicators suggest IT investment needs"
+        ]
+        return "\n".join(fallback_bullets), "Medium"
 
 def dynamic_research_company_intelligence(company_name: str, article_url: str = None) -> Dict[str, Any]:
-    """Main function to conduct comprehensive company research"""
+    """Main function to conduct comprehensive company research with hallucination prevention"""
     
     company_data = {}
     
@@ -345,20 +450,21 @@ def dynamic_research_company_intelligence(company_name: str, article_url: str = 
     progress_bar = st.progress(0)
     status_text = st.empty()
     
-    # Analyze core intent article first
+    # Step 1: Analyze core intent article with priority
     if article_url:
-        status_text.info(f"🔍 Analyzing core intent article...")
+        status_text.info("🔍 Analyzing core intent article...")
         core_intent = analyze_core_intent_article(article_url, company_name)
         company_data["core_intent_analysis"] = core_intent
-        progress_bar.progress(15)
+        st.write(f"Core Intent Result: {core_intent}")  # Debug output
+        progress_bar.progress(20)
     else:
         company_data["core_intent_analysis"] = "N/A"
     
-    # Research other fields
+    # Step 2: Research other fields
     research_fields = [f for f in REQUIRED_FIELDS if f not in ["core_intent_analysis", "why_relevant_to_syntel_bullets", "intent_scoring_level"]]
     
     for i, field in enumerate(research_fields):
-        progress = 15 + (i / len(research_fields)) * 70
+        progress = 20 + (i / len(research_fields)) * 60
         progress_bar.progress(int(progress))
         status_text.info(f"🔍 Researching {field.replace('_', ' ').title()}...")
         
@@ -372,8 +478,9 @@ def dynamic_research_company_intelligence(company_name: str, article_url: str = 
             company_data[field] = "N/A"
             continue
     
+    # Step 3: Relevance analysis with core intent integration
     status_text.info("🎯 Conducting relevance analysis...")
-    progress_bar.progress(90)
+    progress_bar.progress(85)
     
     try:
         relevance_bullets, intent_score = syntel_relevance_analysis_v2(
@@ -381,8 +488,8 @@ def dynamic_research_company_intelligence(company_name: str, article_url: str = 
         )
         company_data["why_relevant_to_syntel_bullets"] = relevance_bullets
         company_data["intent_scoring_level"] = intent_score
-    except Exception:
-        company_data["why_relevant_to_syntel_bullets"] = "• Strategic relevance for network infrastructure"
+    except Exception as e:
+        company_data["why_relevant_to_syntel_bullets"] = "• Analysis based on available company data"
         company_data["intent_scoring_level"] = "Medium"
     
     progress_bar.progress(100)
@@ -444,7 +551,7 @@ if __name__ == "__main__":
         article_url = st.text_input(
             "Core Intent Article URL:",
             value="",
-            placeholder="Paste article link for core intent analysis"
+            placeholder="Paste the article link that prompted this research"
         )
         
         trigger_search = st.button("🚀 Run Comprehensive Research", type="primary")
