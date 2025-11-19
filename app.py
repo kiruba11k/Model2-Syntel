@@ -328,13 +328,13 @@ def syntel_relevance_analysis_v2(company_data: Dict, company_name: str) -> tuple
 
     # 2. Define the strict GTM prompt
     relevance_prompt = f"""
-    You are evaluating whether the company below is relevant to Syntel’s Go-To-Market for Wi-Fi & Network Integration.
+    You are evaluating whether the company below is relevant to Syntel's Go-To-Market for Wi-Fi & Network Integration.
     
     ---
     **SYNTEL GTM FOCUS**
     **Geography:** India
     **Industries:** Ports, Stadiums, Education, Manufacturing, Healthcare, Hospitality, **Warehouses**, BFSI, IT/ITES, GCCs
-    **ICP:** 150–500+ employees, ₹100 Cr+ revenue
+    **ICP:** 150-500+ employees, ₹100 Cr+ revenue
     **Key Buying Signals (HIGH INTENT):**
     - Opening or expanding factories, offices, campuses, **warehouses** (especially 2024/2025/2026 dates).
     - Digital transformation / cloud modernization
@@ -465,46 +465,51 @@ def dynamic_research_company_intelligence(company_name: str) -> Dict[str, Any]:
     
     return company_data
 
-def format_concise_display_with_sources(company_input: str, data_dict: dict) -> pd.DataFrame:
-    """Transform data into clean, professional display format"""
+def format_horizontal_display_with_sources(company_input: str, data_dict: dict) -> pd.DataFrame:
+    """Transform data into clean, professional HORIZONTAL display format"""
     
     mapping = {
-        "Company Name": "company_name", "LinkedIn URL": "linkedin_url", "Company Website URL": "company_website_url", 
-        "Industry Category": "industry_category", "Employee Count (LinkedIn)": "employee_count_linkedin",
-        "Headquarters (Location)": "headquarters_location", "Revenue (Source)": "revenue_source",
-        "Branch Network / Facilities Count": "branch_network_count", "Expansion News (Last 12 Months)": "expansion_news_12mo",
-        "Digital Transformation Initiatives": "digital_transformation_initiatives", "IT Leadership Change": "it_leadership_change",
-        "Existing Network Vendors": "existing_network_vendors", "Wi-Fi/LAN Tender Found": "wifi_lan_tender_found",
-        "IoT/Automation/Edge": "iot_automation_edge_integration", "Cloud Adoption/GCC": "cloud_adoption_gcc_setup",
-        "Physical Infrastructure": "physical_infrastructure_signals", "IT Infra Budget/Capex": "it_infra_budget_capex",
-        "Intent Scoring": "intent_scoring_level", "Why Relevant to Syntel": "why_relevant_to_syntel_bullets",
+        "Company Name": "company_name", 
+        "LinkedIn URL": "linkedin_url", 
+        "Company Website URL": "company_website_url", 
+        "Industry Category": "industry_category", 
+        "Employee Count (LinkedIn)": "employee_count_linkedin",
+        "Headquarters (Location)": "headquarters_location", 
+        "Revenue (Source)": "revenue_source",
+        "Branch Network / Facilities Count": "branch_network_count", 
+        "Expansion News (Last 12 Months)": "expansion_news_12mo",
+        "Digital Transformation Initiatives": "digital_transformation_initiatives", 
+        "IT Leadership Change": "it_leadership_change",
+        "Existing Network Vendors": "existing_network_vendors", 
+        "Wi-Fi/LAN Tender Found": "wifi_lan_tender_found",
+        "IoT/Automation/Edge": "iot_automation_edge_integration", 
+        "Cloud Adoption/GCC": "cloud_adoption_gcc_setup",
+        "Physical Infrastructure": "physical_infrastructure_signals", 
+        "IT Infra Budget/Capex": "it_infra_budget_capex",
+        "Why Relevant to Syntel": "why_relevant_to_syntel_bullets",
+        "Intent Scoring": "intent_scoring_level"
     }
     
-    data_list = []
+    # Create a dictionary for the single row
+    row_data = {}
     for display_col, data_field in mapping.items():
         if display_col == "Company Name":
-            value = company_input
+            row_data[display_col] = company_input
         else:
-            value = data_dict.get(data_field, "N/A")
-        
-        data_list.append({"Column Header": display_col, "Value": str(value)})
-            
-    df = pd.DataFrame(data_list)
+            row_data[display_col] = data_dict.get(data_field, "N/A")
+    
+    # Create DataFrame with one row and field names as columns
+    df = pd.DataFrame([row_data])
     return df
 
-# --- Streamlit UI (Execution Block - UNCHANGED) ---
+# --- Streamlit UI (Execution Block - MODIFIED for horizontal display) ---
 if __name__ == "__main__":
-    # Removed DEFAULT_COMPANY = "Snowman Logistics"
-    
     st.title(" Dynamic Company Intelligence Generator")
     st.sidebar.header("Configuration")
     
-    # MODIFICATION 1: Removed default company
-    # The key is to use the 'key' argument for st.text_input to capture input on Enter
-    # We use a button to explicitly trigger the search
     company_name = st.sidebar.text_input(
         "Enter Company Name to Research:", 
-        value="", # Start with an empty string, no default
+        value="",
         key="company_input_box",
         placeholder="e.g., Snowman Logistics"
     )
@@ -518,22 +523,12 @@ if __name__ == "__main__":
     # This button explicitly triggers the search
     trigger_search = st.sidebar.button("Run Comprehensive Research")
     
-    # MODIFICATION 2: Logic to trigger search only on button press or Enter (implied by text_input behavior)
-    # The search is triggered if:
-    # 1. The explicit button is pressed AND the input box has a value.
-    # 2. The user has pressed 'Enter' in the text input, which often triggers the final state update. 
-    #    We check if the *current* input is different from the *last searched* name AND not empty.
-    
     search_triggered = False
     
     if trigger_search and company_name:
         st.session_state['company_name_to_search'] = company_name
         st.session_state['company_data'] = None # Clear old data
         search_triggered = True
-    
-    # Check if a new, non-empty value was just entered/submitted, and run research if it's new.
-    # We're now relying on the button press logic above to be the primary trigger. 
-    # This prevents automatic search on every character change.
     
     # Execution Block: Only run research if a search was just triggered OR if data is missing for the current target
     if st.session_state['company_name_to_search'] and st.session_state['company_data'] is None:
@@ -549,23 +544,25 @@ if __name__ == "__main__":
         current_company = st.session_state['company_name_to_search']
         st.header(f" Extracted Intelligence: {current_company}")
         
-        df_display = format_concise_display_with_sources(
+        # MODIFIED: Use horizontal format instead of vertical
+        df_display = format_horizontal_display_with_sources(
             current_company, 
             st.session_state['company_data']
         )
         
-        st.dataframe(df_display.set_index('Column Header'), use_container_width=True)
+        # Display the horizontal dataframe
+        st.dataframe(df_display, use_container_width=True)
 
-        # ... (Download button functions remain unchanged) ...
+        # Download button functions
         def to_excel(df):
             output = BytesIO()
             writer = pd.ExcelWriter(output, engine='xlsxwriter')
-            df.to_excel(writer, index=True, sheet_name='Company_Intel')
+            df.to_excel(writer, index=False, sheet_name='Company_Intel')
             writer.close()
             processed_data = output.getvalue()
             return processed_data
 
-        excel_data = to_excel(df_display.set_index('Column Header'))
+        excel_data = to_excel(df_display)
         st.download_button(
             label="Download as Excel",
             data=excel_data,
