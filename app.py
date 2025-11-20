@@ -425,7 +425,7 @@ def syntel_relevance_analysis_v2(company_data: Dict, company_name: str, core_int
     
     data_context = "\n".join(context_lines)
 
-    # MODIFICATION START: Updated Relevance Prompt with Scoring Criteria
+    # Relevance Prompt (No change, as the prompt is already structured to ask for TSV)
     relevance_prompt = f"""
     You are evaluating whether the company below is relevant to Syntel's Go-To-Market for Wi-Fi & Network Integration.
     
@@ -464,40 +464,59 @@ def syntel_relevance_analysis_v2(company_data: Dict, company_name: str, core_int
     - Do not include headers in the output
     - Ensure the points are short and professional
     """
-    # MODIFICATION END
-
+    
     try:
-        # LLM System Message remains the same but now strictly enforces the new scoring rules.
         response = llm_groq.invoke([
-            SystemMessage(content="You are a meticulous GTM analyst. Generate the output *only* in the requested TSV format, following all rules for specificity, the **1), 2), 3) numbered list format**, and **STRICTLY adhere to the provided SCORING CRITERIA**. Integrate core intent insights where relevant."),
+            SystemMessage(content="You are a meticulous GTM analyst. Generate the output *only* in the requested TSV format, following all rules for specificity, the **1), 2), 3) numbered list format**, and **STRICTLY adhere to the provided SCORING CRITERIA**. Integrate core intent insights where relevant. **Crucially, ensure the third column contains ONLY 'High', 'Medium', or 'Low'.**"),
             HumanMessage(content=relevance_prompt)
         ]).content.strip()
         
-        # Robust parsing of the TSV output (Parsing logic remains the same)
+        # Robust parsing of the TSV output
         parts = response.split('\t')
-        if len(parts) == 3:
-            company, relevance_text, score = parts
+        
+        # CRITICAL FIX 1: Normalize the raw TSV response to handle extra newlines/spaces
+        if len(parts) >= 3:
+            company = parts[0].strip()
+            relevance_text_raw = parts[1].strip()
+            score_raw = parts[2].strip()
+
+            # --- Score Extraction (Fix for Intent Scoring column) ---
+            # Search for the final 'High', 'Medium', or 'Low' and discard any extra text/bullets the LLM put there
+            score_match = re.search(r'(High|Medium|Low)', score_raw, re.IGNORECASE)
             
-            # ... (Strict bullet point enforcement and formatting logic) ...
-            # The rest of the logic for parsing and formatting the 3 bullet points is unchanged
+            if score_match:
+                score = score_match.group(0)
+            else:
+                score = "Medium" # Fallback if score is not found (though LLM is prompted strictly)
+
+            # --- Relevance Text Extraction (Fix for Why Relevant column) ---
             
-            raw_bullets = re.split(r'[\n\r]|(\d+\)|\d+\.)|[\.\-•]', relevance_text)
+            # The LLM often repeats the bullets in the score column, so we rely on the first column for bullets.
+            
+            # 1. Aggressively split the text by common separators (newline, period, hyphen, existing numbers)
+            raw_bullets = re.split(r'[\n\r]|(\d+\)|\d+\.)|[\.\-•]', relevance_text_raw)
             
             cleaned_bullets = []
             for bullet in raw_bullets:
                 if bullet is None: continue 
                 clean_bullet = bullet.strip()
+                # Remove boilerplate introductions/cleanup markdown
                 clean_bullet = re.sub(r'\*\*|\*|__|_|^\w+ Relevant to Syntel|^\s*The reasons are\s*:?', '', clean_bullet, flags=re.IGNORECASE)
                 
+                # Filter out short, empty, or boilerplate phrases
                 if len(clean_bullet) > 10 and not clean_bullet.lower().startswith(company_name.lower()):
                     cleaned_bullets.append(clean_bullet.capitalize())
 
+            # 2. Ensure exactly 3 bullets and apply the final 1), 2), 3) format
             final_bullets = cleaned_bullets[:3]
             
+            # Add fallback bullets if we don't have enough specific ones
             while len(final_bullets) < 3:
                  final_bullets.append("Strategic relevance due to operating in a target industry.")
             
+            # Apply the desired numbered format 1), 2), 3)
             formatted_bullets = "\n".join([f"{i+1}) {point}" for i, point in enumerate(final_bullets)])
+            
             return formatted_bullets, score.strip()
         
         raise ValueError("LLM response not in expected TSV format.")
@@ -525,8 +544,7 @@ def syntel_relevance_analysis_v2(company_data: Dict, company_name: str, core_int
              fallback_bullets_list.append("Scale of operations indicates need for reliable, wide-area network coverage.")
 
         formatted_bullets = "\n".join([f"{i+1}) {point}" for i, point in enumerate(fallback_bullets_list)])
-        return formatted_bullets, "Medium"
-# --- Main Research Function ---
+        return formatted_bullets, "Medium"# --- Main Research Function ---
 
 def dynamic_research_company_intelligence(company_name: str, article_url: str = None) -> Dict[str, Any]:
     """Main function to conduct comprehensive company research"""
