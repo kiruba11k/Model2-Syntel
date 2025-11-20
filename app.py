@@ -287,10 +287,13 @@ def dynamic_extract_field_with_sources(company_name: str, field_name: str, searc
         research_context += f"SOURCE {i+1} - {result.get('title', 'No Title')}:\n"
         research_context += f"CONTENT: {result['content']}\n\n" 
     
-    unique_urls = list(set([result['url'] for result in search_results if result.get('url')]))[:3]
+    # MODIFICATION 1: Collect ALL unique URLs for maximum source inclusion
+    unique_urls = list(set([clean_and_format_url(result['url']) for result in search_results if result.get('url')]))
+    
     prompt = get_detailed_extraction_prompt(company_name, field_name, research_context)
     
     try:
+        # Assuming llm_groq is initialized correctly
         response = llm_groq.invoke([
             SystemMessage(content=f"""You are an expert research analyst. Extract FACTUAL DATA ONLY from the provided research context for {company_name}.
             **CRITICAL INSTRUCTIONS:**
@@ -306,7 +309,6 @@ def dynamic_extract_field_with_sources(company_name: str, field_name: str, searc
         # Enhanced validation for hallucination prevention
         if (not response or 
             response.lower() in ['n/a', 'not found', 'no information', 'information not available', ''] or 
-            len(response) < 5 or
             'not mentioned' in response.lower() or
             'no specific' in response.lower()):
             return "N/A"
@@ -330,16 +332,19 @@ def dynamic_extract_field_with_sources(company_name: str, field_name: str, searc
         response = re.sub(r'\s+', ' ', response) 
         response = response.replace("**", "").replace("*", "") 
         
-        # Add sources for traceability
+        # Add sources for traceability, ensuring all URLs are included in a single cell
         if unique_urls and response != "N/A":
-            source_text = f" [Sources: {', '.join(unique_urls[:2])}]" if len(unique_urls) > 1 else f" [Source: {unique_urls[0]}]"
+            # MODIFICATION 2: Consolidate all unique URLs, separated by comma and space, with no character limit.
+            source_text = f" [Sources: {', '.join(unique_urls)}]" 
             response += source_text
         
-        return response[:500] 
-            
+        # MODIFICATION 3: Remove the 500-character truncation (was: return response[:500])
+        return response
+        
     except Exception as e:
+        # print(f"Error during LLM extraction for {field_name}: {e}") # Debugging line
         return "N/A"
-
+        
 def analyze_core_intent_article(article_url: str, company_name: str) -> str:
     """
     Analyze the core intent article provided by the user
