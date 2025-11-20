@@ -80,7 +80,11 @@ def generate_dynamic_search_queries(company_name: str, field_name: str) -> List[
             f'"{company_name}" IoT automation robotics implementation'
         ],
         "cloud_adoption_gcc_setup": [
-            f'"{company_name}" cloud adoption AWS Azure GCC setup'
+            f'"{company_name}" cloud adoption strategy AWS Azure Google',
+            f'"{company_name}" using AWS services EC2 S3',
+            f'"{company_name}" global capability center GCC setup location',
+            f'"{company_name}" cloud migration update'
+        
         ],
         "physical_infrastructure_signals": [
             f'"{company_name}" new construction facility expansion'
@@ -219,16 +223,16 @@ def get_detailed_extraction_prompt(company_name: str, field_name: str, research_
         
         EXTRACTED IOT/AUTOMATION DETAILS:
         """,
-        
-        "cloud_adoption_gcc_setup": f"""
-        Extract ONLY the specific cloud adoption or GCC setup details mentioned for {company_name} in the research data.
+       "cloud_adoption_gcc_setup": f"""
+        Extract ONLY the specific cloud adoption or GCC setup details **ATTRIBUTED DIRECTLY TO {company_name}** mentioned in the research data.
         
         RESEARCH DATA: {research_context}
         
         REQUIREMENTS:
-        - Extract ONLY specific cloud providers or GCC plans explicitly mentioned
-        - DO NOT assume cloud adoption
-        - If no cloud/GCC details found, state "N/A"
+        - Extract ONLY specific cloud providers (AWS, Azure, GCP) or GCC plans **EXPLICITLY MENTIONED** in relation to {company_name}.
+        - **CRITICAL:** IGNORE all generic descriptions of cloud services (like 'EC2 is a virtual server'), general cloud best practices, or generic third-party service offerings not tied to {company_name}.
+        - DO NOT assume cloud adoption based on industry or partnerships.
+        - If no specific, attributable cloud/GCC details found, state "N/A"
         - Start directly with the extracted data
         
         EXTRACTED CLOUD/GCC DETAILS:
