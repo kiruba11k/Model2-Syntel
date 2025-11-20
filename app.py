@@ -138,15 +138,15 @@ def get_detailed_extraction_prompt(company_name: str, field_name: str, research_
         """,
         
         "expansion_news_12mo": f"""
-        Extract ONLY the factual expansion news for {company_name} from the last 12 months mentioned in the research data.
+        Extract ONLY the factual, recent expansion news for {company_name} from the last 12-18 months (or with dates 2024/2025/2026) mentioned in the research data.
         
         RESEARCH DATA: {research_context}
         
         REQUIREMENTS:
-        - Extract ONLY specific expansion announcements mentioned in the research
-        - Include dates and locations ONLY if explicitly stated
-        - DO NOT infer or assume any expansions
-        - If no expansion news found, state "N/A"
+        - Extract ONLY specific expansion announcements, such as **new facility acquisitions, greenfield projects, brownfield capacity additions, or major investment commitments.**
+        - Include dates, locations, and financial figures (e.g., capex) ONLY if explicitly stated.
+        - **CRITICAL:** DO NOT infer or assume any expansions. Ignore generic statements about 'growth' or 'market share increase.'
+        - If no recent, concrete expansion news is found, state "N/A"
         - Start directly with the extracted data
         
         EXTRACTED EXPANSION NEWS:
