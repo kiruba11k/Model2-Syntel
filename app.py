@@ -420,12 +420,13 @@ def syntel_relevance_analysis_v2(company_data: Dict, company_name: str, core_int
     context_lines = []
     for field, value in company_data.items():
         if value and value != "N/A" and field not in ["why_relevant_to_syntel_bullets", "intent_scoring_level", "core_intent_analysis"]:
+            # Ensure sources are removed to keep context clean for the LLM
             clean_value = re.sub(r'\[Sources?:[^\]]+\]', '', value).strip()
             context_lines.append(f"{field.replace('_', ' ').title()}: {clean_value}")
     
     data_context = "\n".join(context_lines)
 
-    # Enhanced prompt with core intent integration
+    # Enhanced prompt with core intent integration (PROMPT REMAINS UNCHANGED)
     relevance_prompt = f"""
     You are evaluating whether the company below is relevant to Syntel's Go-To-Market for Wi-Fi & Network Integration.
     
@@ -478,25 +479,38 @@ def syntel_relevance_analysis_v2(company_data: Dict, company_name: str, core_int
         if len(parts) == 3:
             company, relevance_text, score = parts
             
-            bullets = relevance_text.split('\n')
+            # Start of MODIFICATION: Strict bullet point enforcement
+            
+            # 1. Aggressively split the text by common separators (newline, period, hyphen)
+            raw_bullets = re.split(r'[\n•\-\.]', relevance_text)
             
             cleaned_bullets = []
-            for bullet in bullets:
-                clean_bullet = re.sub(r'^[•\-\s]*', '• ', bullet.strip())
+            for bullet in raw_bullets:
+                clean_bullet = bullet.strip()
+                # Remove markdown characters and ensure it starts cleanly
                 clean_bullet = re.sub(r'\*\*|\*|__|_', '', clean_bullet)
-                if len(clean_bullet) > 5:
-                    cleaned_bullets.append(clean_bullet)
+                
+                # Filter out short, empty, or boilerplate phrases
+                if len(clean_bullet) > 10 and not clean_bullet.lower().startswith('company name'):
+                    # Prepend the bullet marker and ensure case consistency
+                    cleaned_bullets.append('• ' + clean_bullet.capitalize())
 
-            while len(cleaned_bullets) < 3:
-                 cleaned_bullets.append("• Strategic relevance due to being a target industry.")
+            # 2. Ensure exactly 3 bullets, using fallback text if needed
+            final_bullets = cleaned_bullets[:3]
             
-            formatted_bullets = "\n".join(cleaned_bullets[:3])
+            # Add fallback bullets if we don't have enough specific ones
+            while len(final_bullets) < 3:
+                 final_bullets.append("• Strategic relevance due to being a target industry.")
+            
+            formatted_bullets = "\n".join(final_bullets)
             return formatted_bullets, score.strip()
+        
+        # End of MODIFICATION
         
         raise ValueError("LLM response not in expected TSV format.")
 
     except Exception:
-        # Enhanced fallback with core intent consideration
+        # Fallback block (remains effective as a final safety net)
         fallback_bullets_list = []
         
         # 1. Core Intent Signal
@@ -518,7 +532,6 @@ def syntel_relevance_analysis_v2(company_data: Dict, company_name: str, core_int
              fallback_bullets_list.append("• Scale of operations indicates need for reliable, wide-area network coverage.")
 
         return "\n".join(fallback_bullets_list), "Medium"
-
 # --- Main Research Function ---
 
 def dynamic_research_company_intelligence(company_name: str, article_url: str = None) -> Dict[str, Any]:
