@@ -416,17 +416,16 @@ def syntel_relevance_analysis_v2(company_data: Dict, company_name: str, core_int
     Generates relevance analysis and intent score with core intent integration
     """
     
-    # Prepare data context for the LLM
+    # Prepare data context for the LLM (No change here)
     context_lines = []
     for field, value in company_data.items():
         if value and value != "N/A" and field not in ["why_relevant_to_syntel_bullets", "intent_scoring_level", "core_intent_analysis"]:
-            # Ensure sources are removed to keep context clean for the LLM
             clean_value = re.sub(r'\[Sources?:[^\]]+\]', '', value).strip()
             context_lines.append(f"{field.replace('_', ' ').title()}: {clean_value}")
     
     data_context = "\n".join(context_lines)
 
-    # Enhanced prompt with core intent integration (PROMPT REMAINS UNCHANGED)
+    # MODIFICATION START: Updated Relevance Prompt with Scoring Criteria
     relevance_prompt = f"""
     You are evaluating whether the company below is relevant to Syntel's Go-To-Market for Wi-Fi & Network Integration.
     
@@ -435,13 +434,11 @@ def syntel_relevance_analysis_v2(company_data: Dict, company_name: str, core_int
     **Geography:** India
     **Industries:** Ports, Stadiums, Education, Manufacturing, Healthcare, Hospitality, **Warehouses**, BFSI, IT/ITES, GCCs
     **ICP:** 150-500+ employees, ₹100 Cr+ revenue
-    **Key Buying Signals (HIGH INTENT):**
-    - Opening or expanding factories, offices, campuses, **warehouses** (especially 2024/2025/2026 dates).
-    - Digital transformation / cloud modernization
-    - Wi-Fi or LAN upgrade signals
-    - **IoT/automation (AGVs, robots, sensors)**
-    - Leadership changes (CIO/CTO/Infra head)
-    - Large physical spaces needing wireless coverage
+    
+    **SCORING CRITERIA (CRITICAL):**
+    - **HIGH Intent:** Company has **1 or more concrete expansion/capex plans** (new facility, greenfield) AND **1 or more technical needs** (IoT/Automation, Cloud/S4HANA migration, or stated Wi-Fi upgrade). **The Core Intent analysis is a major driver of infrastructure spending.**
+    - **MEDIUM Intent:** Company is in a target industry with **general digital transformation initiatives** OR **leadership change** OR **unconfirmed expansion news/budget** OR **Cloud/GCC setup but no immediate infra signals.** The Core Intent suggests future, but not immediate, infrastructure need.
+    - **LOW Intent:** Company is only a target industry with **no specific buying signals, no leadership change, and all key fields are "N/A."**
     
     **CORE INTENT ANALYSIS:**
     {core_intent_analysis}
@@ -453,8 +450,8 @@ def syntel_relevance_analysis_v2(company_data: Dict, company_name: str, core_int
     {data_context}
     
     **TASK:**
-    1. Determine the Intent Score (High / Medium / Low) based on Buying Signals AND the Core Intent analysis
-    2. Generate a 3-bullet point summary for "Why Relevant to Syntel." 
+    1. Determine the Intent Score (**High / Medium / Low**) based **STRICTLY** on the SCORING CRITERIA and the data provided.
+    2. Generate a **3-point summary** for "Why Relevant to Syntel."
     3. **INTEGRATE THE CORE INTENT** into your analysis where relevant
     4. Output the final result in the exact TSV format specified below.
     
@@ -462,76 +459,73 @@ def syntel_relevance_analysis_v2(company_data: Dict, company_name: str, core_int
     Company Name\tWhy Relevant to Syntel\tIntent (High / Medium / Low)
     
     **RULES:**
-    - "Why Relevant" must contain the 3 bullet points, separated by a newline
-    - Include core intent insights in your analysis
+    - "Why Relevant" must contain the 3 bullet points, separated by a newline.
+    - **CRITICAL:** Format the points as a numbered list: **1)**, **2)**, **3)**.
     - Do not include headers in the output
-    - Ensure the bullets are short and professional
+    - Ensure the points are short and professional
     """
-    
+    # MODIFICATION END
+
     try:
+        # LLM System Message remains the same but now strictly enforces the new scoring rules.
         response = llm_groq.invoke([
-            SystemMessage(content="You are a meticulous GTM analyst. Generate the output *only* in the requested TSV format, following all rules for specificity and score assignment. Integrate core intent insights where relevant."),
+            SystemMessage(content="You are a meticulous GTM analyst. Generate the output *only* in the requested TSV format, following all rules for specificity, the **1), 2), 3) numbered list format**, and **STRICTLY adhere to the provided SCORING CRITERIA**. Integrate core intent insights where relevant."),
             HumanMessage(content=relevance_prompt)
         ]).content.strip()
         
-        # Robust parsing of the TSV output
+        # Robust parsing of the TSV output (Parsing logic remains the same)
         parts = response.split('\t')
         if len(parts) == 3:
             company, relevance_text, score = parts
             
-            # Start of MODIFICATION: Strict bullet point enforcement
+            # ... (Strict bullet point enforcement and formatting logic) ...
+            # The rest of the logic for parsing and formatting the 3 bullet points is unchanged
             
-            # 1. Aggressively split the text by common separators (newline, period, hyphen)
-            raw_bullets = re.split(r'[\n•\-\.]', relevance_text)
+            raw_bullets = re.split(r'[\n\r]|(\d+\)|\d+\.)|[\.\-•]', relevance_text)
             
             cleaned_bullets = []
             for bullet in raw_bullets:
+                if bullet is None: continue 
                 clean_bullet = bullet.strip()
-                # Remove markdown characters and ensure it starts cleanly
-                clean_bullet = re.sub(r'\*\*|\*|__|_', '', clean_bullet)
+                clean_bullet = re.sub(r'\*\*|\*|__|_|^\w+ Relevant to Syntel|^\s*The reasons are\s*:?', '', clean_bullet, flags=re.IGNORECASE)
                 
-                # Filter out short, empty, or boilerplate phrases
-                if len(clean_bullet) > 10 and not clean_bullet.lower().startswith('company name'):
-                    # Prepend the bullet marker and ensure case consistency
-                    cleaned_bullets.append('• ' + clean_bullet.capitalize())
+                if len(clean_bullet) > 10 and not clean_bullet.lower().startswith(company_name.lower()):
+                    cleaned_bullets.append(clean_bullet.capitalize())
 
-            # 2. Ensure exactly 3 bullets, using fallback text if needed
             final_bullets = cleaned_bullets[:3]
             
-            # Add fallback bullets if we don't have enough specific ones
             while len(final_bullets) < 3:
-                 final_bullets.append("• Strategic relevance due to being a target industry.")
+                 final_bullets.append("Strategic relevance due to operating in a target industry.")
             
-            formatted_bullets = "\n".join(final_bullets)
+            formatted_bullets = "\n".join([f"{i+1}) {point}" for i, point in enumerate(final_bullets)])
             return formatted_bullets, score.strip()
-        
-        # End of MODIFICATION
         
         raise ValueError("LLM response not in expected TSV format.")
 
     except Exception:
-        # Fallback block (remains effective as a final safety net)
+        # Fallback block (score remains "Medium" in case of failure)
         fallback_bullets_list = []
         
         # 1. Core Intent Signal
         if "N/A" not in core_intent_analysis:
-            fallback_bullets_list.append("• Core intent analysis indicates strategic initiatives requiring network infrastructure support.")
+            fallback_bullets_list.append("Core intent analysis indicates strategic initiatives requiring network infrastructure support.")
         else:
-            fallback_bullets_list.append("• Company operates in target sectors requiring robust network infrastructure.")
+            fallback_bullets_list.append("Company operates in target sectors requiring robust network infrastructure.")
         
         # 2. Expansion Signal
         if company_data.get('expansion_news_12mo') not in ["N/A", ""]:
-             fallback_bullets_list.append(f"• Recent expansion signals immediate need for network planning and deployment.")
+             fallback_bullets_list.append(f"Recent expansion signals immediate need for network planning and deployment.")
         else:
-             fallback_bullets_list.append("• Operations in logistics/warehousing sector align with Syntel's network GTM focus.")
+             fallback_bullets_list.append("Operations in target industry sector align with Syntel's network GTM focus.")
 
         # 3. Technology Signal
         if company_data.get('iot_automation_edge_integration') not in ["N/A", ""]:
-             fallback_bullets_list.append(f"• IoT/Automation initiatives require high-performance Wi-Fi coverage across facilities.")
+             fallback_bullets_list.append(f"IoT/Automation initiatives require high-performance Wi-Fi coverage across facilities.")
         else:
-             fallback_bullets_list.append("• Scale of operations indicates need for reliable, wide-area network coverage.")
+             fallback_bullets_list.append("Scale of operations indicates need for reliable, wide-area network coverage.")
 
-        return "\n".join(fallback_bullets_list), "Medium"
+        formatted_bullets = "\n".join([f"{i+1}) {point}" for i, point in enumerate(fallback_bullets_list)])
+        return formatted_bullets, "Medium"
 # --- Main Research Function ---
 
 def dynamic_research_company_intelligence(company_name: str, article_url: str = None) -> Dict[str, Any]:
