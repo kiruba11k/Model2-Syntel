@@ -1,292 +1,302 @@
-Automated Company Research & Intent Analysis System
+# **Automated Company Research & Intent Analysis System**
 
-A Streamlit + Groq + Tavily powered research automation tool
+A fully automated research and intent-analysis workflow powered by **Streamlit**, **Groq**, and **Tavily**.
+Designed for both technical and non-technical users.
+##Live Link : https://lsm2sy.streamlit.app/
+---
 
-1. Overview
+## **1. Overview**
 
-This application automates company-level research and generates structured insights using:
+This application automates company-level research and produces structured, factual insights using:
 
-Groq LLM (LLaMA 3.1 8B) for fast and accurate text extraction
+* **Groq LLM (LLaMA 3.1 8B)** for high-speed and accurate text extraction
+* **Tavily Search API** for real-time web research
+* **Streamlit** for an interactive and user-friendly interface
 
-Tavily Search API for web research
+The system is capable of generating:
 
-Streamlit for the user interface
+* Company intelligence
+* Buying signals
+* Strategic intent analysis
+* **Syntel relevance scoring** (High / Medium / Low)
 
-The system extracts factual information, validates it, removes hallucinations, and produces:
+All outputs include traceable sources, validated details, and hallucination-free insights.
+Non-technical users can operate the tool with ease as long as the required API keys are provided.
 
-Company intelligence
+---
 
-Buying signals
+## **2. Features**
 
-Strategic intent analysis
+### **Automated Web Research**
 
-Syntel relevance scoring (High / Medium / Low)
+* Dynamically generates keyword-rich search queries.
+* Collects information from multiple trusted online sources via Tavily.
 
-Clean, traceable outputs with source links
+### **LLM-Powered Information Extraction**
 
-This application is designed so any non-technical user can easily operate it, provided the required API keys are available.
+* Extracts only factual, source-verified content.
+* Removes assumptions, hallucinated insights, and unsupported claims.
 
-2. Features
-Automated Web Research
+### **Core Intent Analysis**
 
-Dynamically generates queries based on the company name.
+* Evaluates company news or articles to determine strategic direction.
+* Maps intent to technology, infrastructure, and expansion signals.
 
-Gathers data from multiple reliable sources using Tavily.
+### **Syntel GTM Relevance Evaluation**
 
-LLM-Powered Information Extraction
+Outputs include:
 
-Extracts factual content only.
+* Three-point relevance summary
+* **Intent Score:** High / Medium / Low
+* TSV-formatted structured data
 
-Removes assumptions, hallucinations, and unsupported claims.
+### **Source Traceability**
 
-Core Intent Analysis
+* Every field includes links to the original sources for verification.
 
-Evaluates company news or articles to determine strategic direction.
+### **Non-Technical Friendly UI**
 
-Connects this intent to infrastructure and technology requirements.
+* Clean Streamlit interface
+* Simple input fields
+* One-click analysis workflow
 
-Syntel GTM Relevance Evaluation
+---
 
-Uses structured criteria to determine if the company is a good target.
+## **3. Technology Stack**
 
-Returns:
+| Component               | Purpose                           |
+| ----------------------- | --------------------------------- |
+| Python 3.10+            | Core development language         |
+| Streamlit               | Web-based UI                      |
+| Groq LLM (LLaMA 3.1 8B) | Fast and accurate text extraction |
+| Tavily API              | Web search and data gathering     |
+| LangChain               | LLM orchestration                 |
+| Pandas                  | Data handling and formatting      |
 
-3-point summary of relevance
+---
 
-Intent Score: High / Medium / Low
+## **4. System Requirements**
 
-TSV formatted output
+* Python **3.10 or higher**
+* Stable internet connection
+* Required API keys:
 
-Source Traceability
+  * `GROQ_API_KEY`
+  * `TAVILY_API_KEY`
 
-Every extracted field includes original URLs for verification.
+---
 
-Non-Technical Friendly UI
+## **5. Installation (Step-by-Step)**
 
-Streamlit-based interface
+### **Step 1: Clone the Repository**
 
-Simple input fields
+```bash
+git clone "https://github.com/kiruba11k/Model2-Syntel.git"
+cd Model2-Syntel
+```
 
-One-click analysis
+### **Step 2: Create a Virtual Environment**
 
-3. Technology Stack
-Component	Purpose
-Python 3.10+	Core language
-Streamlit	Web-based UI
-Groq LLM (LLaMA 3.1 8B)	High-speed text extraction
-Tavily API	Search and research
-LangChain	LLM orchestration
-Pandas	Data handling
-4. System Requirements
-
-Python 3.10 or higher
-
-Internet connection
-
-Valid API keys:
-
-GROQ_API_KEY
-
-TAVILY_API_KEY
-
-5. Installation (Step-by-Step)
-Step 1: Clone the Repository
-git clone <your-repo-url>
-cd <your-repo-folder>
-
-Step 2: Create a Virtual Environment
+```bash
 python -m venv venv
+```
 
+**Activate the environment**
 
-Activate it:
+**Windows:**
 
-Windows
-
+```bash
 venv\Scripts\activate
+```
 
+**Mac/Linux:**
 
-Mac/Linux
-
+```bash
 source venv/bin/activate
+```
 
-Step 3: Install Dependencies
+### **Step 3: Install Dependencies**
+
+```bash
 pip install -r requirements.txt
+```
 
-Step 4: Add API Keys to Streamlit Secrets
+### **Step 4: Add API Keys to Streamlit Secrets**
 
-Create the file:
+Create file:
 
+```
 .streamlit/secrets.toml
+```
 
+Add:
 
-Add the keys:
-
+```toml
 GROQ_API_KEY = "your_groq_key"
 TAVILY_API_KEY = "your_tavily_key"
+```
 
-Step 5: Run the Application
+### **Step 5: Run the Application**
+
+```bash
 streamlit run app.py
+```
 
+The app will open in your default browser.
 
-The application will open automatically in your browser.
+---
 
-6. Application Workflow (Non-Technical Explanation)
+## **6. Application Workflow (Non-Technical Explanation)**
 
-Enter the Company Name
-The system uses this to generate research queries.
+1. **Enter the Company Name**
+   Used to generate intelligent research queries.
 
-Optionally Provide a News Article URL
-This helps extract the company's “core intent”.
+2. **Optionally Add a News Article URL**
+   Enables deeper strategic intent analysis.
 
-Click “Run Analysis”
-The system will:
+3. **Click “Run Analysis”**
+   The system will:
 
-Search the internet
+   * Search the internet
+   * Extract and validate data
+   * Remove hallucinations
+   * Generate structured insights
 
-Extract data
+4. **View Results**
+   You will receive detailed insights, including:
 
-Validate facts
+   * Branch network
+   * Expansion and hiring signals
+   * Digital transformation initiatives
+   * IT leadership updates
+   * Cloud / Infrastructure / GCC plans
+   * IoT / Automation activity
+   * Tender and procurement details
+   * Full strategic intent analysis
+   * **Syntel relevance score**
+   * TSV-ready structured output
 
-Remove hallucinations
+You can copy or download the results for CRM updates, reports, or GTM planning.
 
-Generate clean structured insights
+---
 
-View the Output
-You will receive:
+## **7. Code Architecture**
 
-Branch network details
+### **Key Components**
 
-Expansion plans
+#### **Dynamic Search Generator**
 
-Digital transformation initiatives
+Creates optimized search queries based on the company context.
 
-IT leadership updates
+#### **Search + Extraction Layer**
 
-Infrastructure signals
+Fetches and aggregates relevant text from multiple sources.
 
-Cloud/GCC setup
+#### **LLM Extraction Engine**
 
-Tender information
-
-IoT/automation activity
-
-Full core intent analysis
-
-Syntel relevance score
-
-TSV-formatted result
-
-You can download or copy the output for reporting or CRM updates.
-
-7. Code Architecture
-Key Components
-
-Dynamic Search Generation
-Produces context-aware search queries.
-
-Search + Extraction Layer
-Collects relevant text from multiple sources.
-
-LLM Extraction Engine
 Ensures:
 
-Factual accuracy
+* High factual accuracy
+* Clean normalized outputs
+* Zero assumptions
 
-No assumptions
+#### **Core Intent Analyzer**
 
-Clean formatting
+Interprets news articles to identify strategic direction and upcoming initiatives.
 
-Core Intent Analyzer
-Reads the article and extracts strategic direction.
+#### **Relevance Engine (v2)**
 
-Relevance Engine (Version 2)
-Applies strict scoring rules to determine intent level.
+Scores the company based on strict GTM rules.
 
-8. Important Design Principles
-Hallucination Prevention
+---
 
-Only extracts data explicitly found in search results
+## **8. Important Design Principles**
 
-Rejects:
+### **Hallucination Prevention**
 
-Assumptions
+The system extracts only information explicitly present in search results.
+It rejects:
 
-Generic statements
+* Assumptions
+* Generic statements
+* Inferred or speculative insights
 
-Inferred information
+### **Source Traceability**
 
-Source Traceability
+Each extracted field contains:
 
-Every extracted field includes:
-
+```
 [Sources: url1, url2, ...]
+```
 
-Strict Formatting Rules
+### **Strict Formatting**
 
-TSV outputs
+* TSV structured output
+* Numbered summaries
+* Clean text normalization
 
-Numbered summaries
+---
 
-Clean text normalization
+## **9. File Structure**
 
-9. File Structure
+```
 project/
 │
-├── app.py                      # Main Streamlit application
+├── app.py                  # Main Streamlit application
 ├── requirements.txt
 ├── README.md
 └── .streamlit/
-    └── secrets.toml            # API keys
+    └── secrets.toml        # API keys
+```
 
-10. Troubleshooting
-Missing API Keys
+---
 
-If the app shows:
+## **10. Troubleshooting**
 
+### **Missing API Keys**
+
+If you see:
+
+```
 ERROR: Both GROQ_API_KEY and TAVILY_API_KEY must be set
+```
 
+Ensure the keys are correctly placed in `secrets.toml`.
 
-Ensure secrets are added correctly.
-
-LLM Initialization Error
+### **LLM Initialization Errors**
 
 Check:
 
-Internet connection
+* Internet connectivity
+* Valid Groq API key
+* Firewall restrictions
 
-Valid Groq API key
+### **No Search Results**
 
-No firewall restriction
+Try:
 
-No Search Results
+* Adding “Pvt Ltd” to the name
+* Adding industry keywords
 
-Some companies may have limited online visibility.
-You may try:
+---
 
-Adding “Pvt Ltd” to the name
+## **11. Security Notes**
 
-Adding industry keywords
+* API keys are securely managed via Streamlit Secrets.
+* No data is stored permanently.
+* Sensitive data is not logged or shared.
 
-11. Security Notes
+---
 
-API keys are stored securely using Streamlit Secrets.
+## **12. Intended Users**
 
-No data is stored permanently.
+This tool is ideal for:
 
-Sensitive fields should never be logged or shared.
+* Sales teams
+* Pre-sales engineers
+* GTM strategists
+* Business analysts
+* Research teams
+* Non-technical users needing automated intelligence
 
-12. Intended Users
-
-This tool is designed for:
-
-Sales teams
-
-Pre-sales engineers
-
-GTM strategists
-
-Business analysts
-
-Research teams
-
-Non-technical staff needing automated intelligence
+---
