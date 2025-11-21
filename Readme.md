@@ -1,9 +1,9 @@
 # **Automated Company Research & Intent Analysis System**
 
 A fully automated research and intent-analysis workflow powered by **Streamlit**, **Groq**, and **Tavily**.
-Designed for both technical and non-technical users.
+
 ---
-Live Link:https://lsm2sy.streamlit.app/
+Live Link : https://lsm2sy.streamlit.app/
 
 
 ## **1. Overview**
